@@ -23,76 +23,171 @@ else
             <div class="error-message">@_error</div>
         }
 
-        <div class="form-group">
-            <label class="form-label">Title</label>
-            <input type="text" class="form-control" @bind="_model.Title" placeholder="Optional title" />
-        </div>
-
+        <!-- Date -->
         <div class="form-group">
             <label class="form-label">Date <span class="required">*</span></label>
             <input type="date" class="form-control" @bind="_occurredDate" />
         </div>
 
-        <div class="form-group">
-            <label class="form-label">Partner</label>
-            <select class="form-control" @bind="_partnerIdStr">
-                <option value="">— None —</option>
-                @foreach (var p in _partners)
-                {
-                    <option value="@p.Id">@p.Data.Name</option>
-                }
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Activity Types</label>
-            <CheckboxList Items="@_activityTypes"
-                          SelectedIds="@_model.ActivityTypeIds"
-                          SelectedIdsChanged="OnActivityTypesChanged" />
-        </div>
-
+        <!-- Duration -->
         <div class="form-group">
             <label class="form-label">Duration (minutes)</label>
             <input type="number" class="form-control" @bind="_model.DurationMinutes" min="1" max="9999" />
         </div>
 
+        <!-- Time of Day (dropdown) -->
+        @if (_timesOfDay.Any())
+        {
+            <div class="form-group">
+                <label class="form-label">Time of Day</label>
+                <select class="form-control" @bind="_timeOfDayIdStr">
+                    <option value="">— Select —</option>
+                    @foreach (var item in _timesOfDay)
+                    {
+                        <option value="@item.Id">@item.Value</option>
+                    }
+                </select>
+            </div>
+        }
+
+        <!-- Location (dropdown) -->
+        @if (_locations.Any())
+        {
+            <div class="form-group">
+                <label class="form-label">Location</label>
+                <select class="form-control" @bind="_locationIdStr">
+                    <option value="">— Select —</option>
+                    @foreach (var item in _locations)
+                    {
+                        <option value="@item.Id">@item.Value</option>
+                    }
+                </select>
+            </div>
+        }
+
+        <!-- Solo toggle -->
         <div class="form-group">
-            <label class="form-label">Location</label>
-            <select class="form-control" @bind="_locationIdStr">
-                <option value="">— Select —</option>
-                @foreach (var item in _locations)
+            <label class="checkbox-pill" style="border-radius:6px">
+                <input type="checkbox" @bind="_model.IsSolo" />
+                <span>Solo session (no partner)</span>
+            </label>
+        </div>
+
+        <!-- Partners — collapsible, hidden when solo -->
+        @if (!_model.IsSolo && _partners.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showPartners = !_showPartners">
+                    <span>Partner(s)</span>
+                    <span class="section-toggle-icon">@(_showPartners ? "▼" : "▶")</span>
+                </button>
+                @if (_showPartners)
                 {
-                    <option value="@item.Id">@item.Value</option>
+                    <div class="checkbox-list">
+                        @foreach (var p in _partners)
+                        {
+                            var pid = p.Id;
+                            <label class="checkbox-pill">
+                                <input type="checkbox"
+                                       checked="@_model.PartnerIds.Contains(pid)"
+                                       @onchange="@(() => TogglePartner(pid))" />
+                                <span>@p.Data.Name</span>
+                            </label>
+                        }
+                    </div>
                 }
-            </select>
-        </div>
+            </div>
+        }
 
-        <div class="form-group">
-            <label class="form-label">Mood</label>
-            <select class="form-control" @bind="_moodIdStr">
-                <option value="">— Select —</option>
-                @foreach (var item in _moods)
+        <!-- Activity Types — collapsible -->
+        @if (_activityTypes.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showActivityTypes = !_showActivityTypes">
+                    <span>Activity Types</span>
+                    <span class="section-toggle-icon">@(_showActivityTypes ? "▼" : "▶")</span>
+                </button>
+                @if (_showActivityTypes)
                 {
-                    <option value="@item.Id">@item.Value</option>
+                    <CheckboxList Items="@_activityTypes"
+                                  SelectedIds="@_model.ActivityTypeIds"
+                                  SelectedIdsChanged="OnActivityTypesChanged" />
                 }
-            </select>
-        </div>
+            </div>
+        }
 
-        <div class="form-group">
-            <label class="form-label">Contraception</label>
-            <CheckboxList Items="@_contraception"
-                          SelectedIds="@_model.ContraceptionIds"
-                          SelectedIdsChanged="OnContraceptionChanged" />
-        </div>
+        <!-- Positions — collapsible -->
+        @if (_positions.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showPositions = !_showPositions">
+                    <span>Positions</span>
+                    <span class="section-toggle-icon">@(_showPositions ? "▼" : "▶")</span>
+                </button>
+                @if (_showPositions)
+                {
+                    <CheckboxList Items="@_positions"
+                                  SelectedIds="@_model.PositionIds"
+                                  SelectedIdsChanged="OnPositionsChanged" />
+                }
+            </div>
+        }
 
-        <div class="form-group">
-            <label class="form-label">Rating (1–5)</label>
-            <input type="number" class="form-control" @bind="_model.Rating" min="1" max="5" />
-        </div>
+        <!-- Roles — collapsible -->
+        @if (_roles.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showRoles = !_showRoles">
+                    <span>Roles</span>
+                    <span class="section-toggle-icon">@(_showRoles ? "▼" : "▶")</span>
+                </button>
+                @if (_showRoles)
+                {
+                    <CheckboxList Items="@_roles"
+                                  SelectedIds="@_model.RoleIds"
+                                  SelectedIdsChanged="OnRolesChanged" />
+                }
+            </div>
+        }
 
+        <!-- Contraception — collapsible -->
+        @if (_contraception.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showContraception = !_showContraception">
+                    <span>Contraception</span>
+                    <span class="section-toggle-icon">@(_showContraception ? "▼" : "▶")</span>
+                </button>
+                @if (_showContraception)
+                {
+                    <CheckboxList Items="@_contraception"
+                                  SelectedIds="@_model.ContraceptionIds"
+                                  SelectedIdsChanged="OnContraceptionChanged" />
+                }
+            </div>
+        }
+
+        <!-- Climax — collapsible -->
+        @if (_climax.Any())
+        {
+            <div class="form-group">
+                <button type="button" class="section-toggle" @onclick="() => _showClimax = !_showClimax">
+                    <span>Climax</span>
+                    <span class="section-toggle-icon">@(_showClimax ? "▼" : "▶")</span>
+                </button>
+                @if (_showClimax)
+                {
+                    <CheckboxList Items="@_climax"
+                                  SelectedIds="@_model.ClimaxIds"
+                                  SelectedIdsChanged="OnClimaxChanged" />
+                }
+            </div>
+        }
+
+        <!-- Notes -->
         <div class="form-group">
             <label class="form-label">Notes</label>
-            <textarea class="form-control" rows="4" @bind="_model.Notes" placeholder="Private notes…"></textarea>
+            <textarea class="form-control" rows="3" @bind="_model.Notes" placeholder="Private notes…"></textarea>
         </div>
 
         <div class="form-actions">
@@ -128,19 +223,28 @@ else
     private bool _confirmDelete;
     private string _error = string.Empty;
 
-    private ActivityRecord _model = new() { ActivityTypeIds = [], ContraceptionIds = [] };
+    private ActivityRecord _model = new();
     private DateTime _occurredDate = DateTime.Today;
 
-    // String intermediaries for nullable-int selects
-    private string _partnerIdStr  = string.Empty;
-    private string _locationIdStr = string.Empty;
-    private string _moodIdStr     = string.Empty;
+    private string _timeOfDayIdStr = string.Empty;
+    private string _locationIdStr  = string.Empty;
+
+    // Collapsible section state — default expanded
+    private bool _showPartners      = true;
+    private bool _showActivityTypes = true;
+    private bool _showPositions     = true;
+    private bool _showRoles         = true;
+    private bool _showContraception = true;
+    private bool _showClimax        = true;
 
     private List<PartnerSummary>   _partners      = [];
     private List<LookupItemRecord> _activityTypes = [];
-    private List<LookupItemRecord> _locations     = [];
-    private List<LookupItemRecord> _moods         = [];
+    private List<LookupItemRecord> _positions     = [];
+    private List<LookupItemRecord> _roles         = [];
     private List<LookupItemRecord> _contraception = [];
+    private List<LookupItemRecord> _climax        = [];
+    private List<LookupItemRecord> _timesOfDay    = [];
+    private List<LookupItemRecord> _locations     = [];
 
     protected override void OnInitialized()
     {
@@ -169,14 +273,23 @@ else
         var actTypes = await LookupService.GetByCategoryNameAsync("Activity Type");
         if (actTypes.IsSuccess) _activityTypes = actTypes.Value!.ToList();
 
-        var locs = await LookupService.GetByCategoryNameAsync("Location");
-        if (locs.IsSuccess) _locations = locs.Value!.ToList();
+        var positions = await LookupService.GetByCategoryNameAsync("Position");
+        if (positions.IsSuccess) _positions = positions.Value!.ToList();
 
-        var moods = await LookupService.GetByCategoryNameAsync("Mood");
-        if (moods.IsSuccess) _moods = moods.Value!.ToList();
+        var roles = await LookupService.GetByCategoryNameAsync("Role");
+        if (roles.IsSuccess) _roles = roles.Value!.ToList();
 
         var contra = await LookupService.GetByCategoryNameAsync("Contraception");
         if (contra.IsSuccess) _contraception = contra.Value!.ToList();
+
+        var climax = await LookupService.GetByCategoryNameAsync("Climax");
+        if (climax.IsSuccess) _climax = climax.Value!.ToList();
+
+        var tod = await LookupService.GetByCategoryNameAsync("Time of Day");
+        if (tod.IsSuccess) _timesOfDay = tod.Value!.ToList();
+
+        var locs = await LookupService.GetByCategoryNameAsync("Location");
+        if (locs.IsSuccess) _locations = locs.Value!.ToList();
     }
 
     private async Task LoadExistingAsync()
@@ -187,33 +300,49 @@ else
             _error = result.Error ?? "Event not found.";
             return;
         }
+
         _model        = result.Value.Data;
         _occurredDate = result.Value.OccurredDate;
 
-        _partnerIdStr  = _model.PartnerId?.ToString()  ?? string.Empty;
-        _locationIdStr = _model.LocationId?.ToString() ?? string.Empty;
-        _moodIdStr     = _model.MoodId?.ToString()     ?? string.Empty;
+        if (_model.PartnerId.HasValue && _model.PartnerIds.Count == 0)
+            _model.PartnerIds.Add(_model.PartnerId.Value);
+
+        _timeOfDayIdStr = _model.TimeOfDayId?.ToString() ?? string.Empty;
+        _locationIdStr  = _model.LocationId?.ToString()  ?? string.Empty;
     }
 
-    private void OnActivityTypesChanged(List<int> ids) { _model.ActivityTypeIds = ids; }
-    private void OnContraceptionChanged(List<int> ids) { _model.ContraceptionIds = ids; }
+    private void TogglePartner(int id)
+    {
+        if (_model.PartnerIds.Contains(id)) _model.PartnerIds.Remove(id);
+        else _model.PartnerIds.Add(id);
+    }
+
+    private void OnActivityTypesChanged(List<int> ids) => _model.ActivityTypeIds  = ids;
+    private void OnPositionsChanged(List<int> ids)     => _model.PositionIds      = ids;
+    private void OnRolesChanged(List<int> ids)         => _model.RoleIds          = ids;
+    private void OnContraceptionChanged(List<int> ids) => _model.ContraceptionIds = ids;
+    private void OnClimaxChanged(List<int> ids)        => _model.ClimaxIds        = ids;
 
     private async Task SaveAsync()
     {
         _error = string.Empty;
+
+        if (!_model.IsSolo && _model.PartnerIds.Count == 0)
+        {
+            _error = "Select at least one partner, or mark as solo.";
+            return;
+        }
+
+        if (_model.IsSolo) _model.PartnerIds.Clear();
+
         _model.OccurredDate = _occurredDate.ToString("yyyy-MM-dd");
-        _model.PartnerId    = int.TryParse(_partnerIdStr,  out var pid) ? pid : (int?)null;
-        _model.LocationId   = int.TryParse(_locationIdStr, out var lid) ? lid : (int?)null;
-        _model.MoodId       = int.TryParse(_moodIdStr,     out var mid) ? mid : (int?)null;
+        _model.TimeOfDayId  = int.TryParse(_timeOfDayIdStr, out var tid) ? tid : (int?)null;
+        _model.LocationId   = int.TryParse(_locationIdStr,  out var lid) ? lid : (int?)null;
 
         _saving = true;
-        Result result;
-
-        if (Id.HasValue)
-            result = await ActivityService.UpdateAsync(Id.Value, _model);
-        else
-            result = await ActivityService.CreateAsync(_model);
-
+        Result result = Id.HasValue
+            ? await ActivityService.UpdateAsync(Id.Value, _model)
+            : await ActivityService.CreateAsync(_model);
         _saving = false;
 
         if (result.IsSuccess)

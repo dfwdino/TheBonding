@@ -145,6 +145,11 @@ public sealed class AuthService : IAuthService
         _cached.FailedAttempts = 0;
         _cached.LockoutUntil   = null;
 
+        // Seed any lookup categories that were added since first setup.
+        // The seeder skips categories that already have items, so this is a no-op
+        // for all but newly introduced categories.
+        await _seeder.SeedDefaultsAsync(_key2);
+
         return Result.Success();
     }
 

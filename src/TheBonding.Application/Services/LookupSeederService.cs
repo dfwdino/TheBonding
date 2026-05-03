@@ -116,6 +116,38 @@ public sealed class LookupSeederService : ILookupSeederService
             "Inconclusive",
             "Pending",
             "Not Tested Yet"
+        ],
+        ["Time of Day"] =
+        [
+            "Morning",
+            "Afternoon",
+            "Evening",
+            "Late Night"
+        ],
+        ["Position"] =
+        [
+            "Missionary",
+            "Doggy Style",
+            "Cowgirl",
+            "Reverse Cowgirl",
+            "Spooning",
+            "Standing",
+            "Sitting",
+            "Other"
+        ],
+        ["Role"] =
+        [
+            "Dominant",
+            "Submissive",
+            "Switch",
+            "Other"
+        ],
+        ["Climax"] =
+        [
+            "Me",
+            "Partner",
+            "Both",
+            "Neither"
         ]
     };
 

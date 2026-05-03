@@ -2,6 +2,7 @@
 @inject IAuthService AuthService
 @inject IActivityService ActivityService
 @inject IPartnerService PartnerService
+@inject ILookupService LookupService
 @inject NavigationManager Nav
 
 <div class="page-header">
@@ -29,6 +30,54 @@ else
         </div>
     </div>
 
+    @if (_climaxItems.Any() && _allEvents.Any())
+    {
+        <div class="section-header">Climax Statistics</div>
+        <div class="climax-stats-table-wrap">
+            <table class="climax-stats-table">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        @foreach (var item in _climaxItems)
+                        {
+                            <th>@item.Value</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Last 30 Days</td>
+                        @foreach (var item in _climaxItems)
+                        {
+                            <td>@GetClimaxCount(30, item.Id)</td>
+                        }
+                    </tr>
+                    <tr>
+                        <td>Last 3 Months</td>
+                        @foreach (var item in _climaxItems)
+                        {
+                            <td>@GetClimaxCount(90, item.Id)</td>
+                        }
+                    </tr>
+                    <tr>
+                        <td>Last 6 Months</td>
+                        @foreach (var item in _climaxItems)
+                        {
+                            <td>@GetClimaxCount(180, item.Id)</td>
+                        }
+                    </tr>
+                    <tr>
+                        <td>Last 1 Year</td>
+                        @foreach (var item in _climaxItems)
+                        {
+                            <td>@GetClimaxCount(365, item.Id)</td>
+                        }
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
+
     <div class="section-header">
         <span>Recent Events</span>
         <a href="/events/new" class="btn-add-small">+ Add Event</a>
@@ -44,10 +93,11 @@ else
             @foreach (var ev in _recentEvents)
             {
                 var evId = ev.Id;
+                var who = ev.Data.IsSolo ? "Solo" : string.Join(", ", ev.Data.PartnerIds.Select(id => _partnerNames.TryGetValue(id, out var n) ? n : "Unknown"));
                 <div class="list-item" @onclick="@(() => EditEvent(evId))">
                     <div class="list-item-main">
-                        <span class="list-item-title">@(string.IsNullOrWhiteSpace(ev.Data.Title) ? "Untitled" : ev.Data.Title)</span>
-                        <span class="list-item-sub">@ev.OccurredDate.ToString("MMM d, yyyy")</span>
+                        <span class="list-item-title">@ev.OccurredDate.ToString("MMM d, yyyy") — @who</span>
+                        <span class="list-item-sub">@(ev.Data.DurationMinutes.HasValue ? $"{ev.Data.DurationMinutes} min" : "")</span>
                     </div>
                     <span class="list-item-arrow">›</span>
                 </div>
@@ -60,8 +110,11 @@ else
     private bool _loading = true;
     private int _partnerCount;
     private int _eventCount;
-    private List<ActivitySummary> _recentEvents = [];
     private int _recentCount;
+    private List<ActivitySummary>  _allEvents    = [];
+    private List<ActivitySummary>  _recentEvents = [];
+    private List<LookupItemRecord> _climaxItems  = [];
+    private Dictionary<int, string> _partnerNames = new();
 
     protected override void OnInitialized()
     {
@@ -75,23 +128,37 @@ else
 
         var partners = await PartnerService.GetAllAsync();
         if (partners.IsSuccess)
+        {
             _partnerCount = partners.Value!.Count(p => p.IsActive);
+            foreach (var p in partners.Value!)
+                _partnerNames[p.Id] = p.Data.Name ?? "Unknown";
+        }
 
         var events = await ActivityService.GetAllAsync();
         if (events.IsSuccess)
         {
-            _eventCount = events.Value!.Count;
-            var cutoff = DateTime.UtcNow.AddDays(-30);
-            _recentEvents = events.Value!
-                .Where(e => e.OccurredDate >= cutoff)
-                .OrderByDescending(e => e.OccurredDate)
-                .Take(10)
-                .ToList();
-            _recentCount = _recentEvents.Count;
+            _allEvents  = events.Value!.OrderByDescending(e => e.OccurredDate).ToList();
+            _eventCount = _allEvents.Count;
+            var cutoff  = DateTime.Today.AddDays(-30);
+            var recent  = _allEvents.Where(e => e.OccurredDate >= cutoff).ToList();
+            _recentCount  = recent.Count;
+            _recentEvents = recent.Take(10).ToList();
         }
+
+        var climax = await LookupService.GetByCategoryNameAsync("Climax");
+        if (climax.IsSuccess)
+            _climaxItems = climax.Value!.OrderBy(c => c.SortOrder).ToList();
 
         _loading = false;
         StateHasChanged();
+    }
+
+    private int GetClimaxCount(int days, int climaxId)
+    {
+        var cutoff = DateTime.Today.AddDays(-days);
+        return _allEvents
+            .Where(e => e.OccurredDate >= cutoff)
+            .Count(e => e.Data.ClimaxIds.Contains(climaxId));
     }
 
     private void EditEvent(int id) => Nav.NavigateTo($"/events/{id}/edit");

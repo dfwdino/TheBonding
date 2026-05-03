@@ -172,11 +172,6 @@ public sealed class DatabaseInitializer
 
     private static async Task SeedLookupCategoriesAsync(SqliteConnection connection)
     {
-        using var checkCmd = connection.CreateCommand();
-        checkCmd.CommandText = "SELECT COUNT(*) FROM LookupCategory;";
-        var count = (long)(await checkCmd.ExecuteScalarAsync() ?? 0L);
-        if (count > 0) return;
-
         // IsSystem = 1 — user cannot delete the category itself,
         // but can still add, edit, and delete individual items within it.
         var categories = new (string Name, int IsSystem)[]
@@ -189,11 +184,26 @@ public sealed class DatabaseInitializer
             ("Gender Identity",     1),
             ("Sexual Orientation",  1),
             ("Health Test Type",    1),
-            ("Health Test Result",  1)
+            ("Health Test Result",  1),
+            ("Time of Day",         1),
+            ("Position",            1),
+            ("Role",                1),
+            ("Climax",              1)
         };
+
+        // Load existing names first so new categories added in future versions
+        // are inserted without touching existing rows.
+        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var listCmd = connection.CreateCommand();
+        listCmd.CommandText = "SELECT Name FROM LookupCategory;";
+        using var listReader = await listCmd.ExecuteReaderAsync();
+        while (await listReader.ReadAsync())
+            existing.Add(listReader.GetString(0));
 
         foreach (var (name, isSystem) in categories)
         {
+            if (existing.Contains(name)) continue;
+
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """
                 INSERT INTO LookupCategory (Name, IsSystem)

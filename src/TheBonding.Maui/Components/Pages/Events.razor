@@ -1,6 +1,8 @@
 @page "/events"
 @inject IAuthService AuthService
 @inject IActivityService ActivityService
+@inject IPartnerService PartnerService
+@inject ILookupService LookupService
 @inject NavigationManager Nav
 
 <div class="page-header">
@@ -12,40 +14,178 @@
 {
     <p class="text-muted">Loading…</p>
 }
-else if (_events.Count == 0)
+else if (_allEvents.Count == 0)
 {
     <p class="empty-state">No events logged yet. Tap <strong>+ Add</strong> to create your first.</p>
 }
 else
 {
-    <div class="filter-row">
-        <input type="text" class="filter-input" placeholder="Search…" @bind="_search" @bind:event="oninput" />
-    </div>
+    @if (!_fullHistory)
+    {
+        <p class="text-muted">
+            Showing last 30 days (@_displayedEvents.Count events).
+            <button class="btn-link-inline" @onclick="ShowFullHistory">Load full history</button>
+        </p>
+    }
+    else
+    {
+        <p class="text-muted">Showing all @_allEvents.Count events.</p>
+    }
 
-    <div class="list-card">
-        @foreach (var ev in Filtered)
+    <div class="event-list">
+        @foreach (var ev in _displayedEvents)
         {
             var evId = ev.Id;
-            <div class="list-item" @onclick="@(() => EditEvent(evId))">
-                <div class="list-item-main">
-                    <span class="list-item-title">@(string.IsNullOrWhiteSpace(ev.Data.Title) ? "Untitled" : ev.Data.Title)</span>
-                    <span class="list-item-sub">@ev.OccurredDate.ToString("MMM d, yyyy")</span>
+            <div class="event-card">
+                <div class="event-card-date">
+                    @ev.OccurredDate.ToString("dddd, MMMM d, yyyy")@(GetTimeOfDayLabel(ev.Data.TimeOfDayId))
                 </div>
-                <span class="list-item-arrow">›</span>
+                <div class="event-card-meta">
+                    @if (ev.Data.DurationMinutes.HasValue)
+                    {
+                        <span class="ev-meta-item">@ev.Data.DurationMinutes min</span>
+                    }
+                    @if (ev.Data.IsSolo)
+                    {
+                        <span class="ev-badge ev-badge-solo">Solo</span>
+                    }
+                    else
+                    {
+                        <span class="ev-badge ev-badge-partner">@string.Join(", ", ev.Data.PartnerIds.Select(id => GetPartnerName(id)))</span>
+                    }
+                </div>
+                @if (ev.Data.ActivityTypeIds.Any())
+                {
+                    <div class="event-card-tags">
+                        @string.Join(", ", ev.Data.ActivityTypeIds.Select(id => GetLookupName(id)))
+                    </div>
+                }
+                <div class="event-card-actions">
+                    <button class="btn-sm btn-outline" @onclick="() => OpenView(ev)">View</button>
+                    <button class="btn-sm btn-outline" @onclick="() => NavigateToEdit(evId)">Edit</button>
+                    <button class="btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(evId)">Delete</button>
+                </div>
             </div>
         }
     </div>
 }
 
+@* ── View modal ─────────────────────────────────────────────────── *@
+@if (_viewEvent is not null)
+{
+    <div class="modal-overlay" @onclick="CloseView">
+        <div class="modal-box event-view-modal" @onclick:stopPropagation="true">
+            <div class="event-view-header">
+                <h2>@_viewEvent.OccurredDate.ToString("dddd, MMMM d, yyyy")@(GetTimeOfDayLabel(_viewEvent.Data.TimeOfDayId))</h2>
+                <button class="btn-close-modal" @onclick="CloseView">✕</button>
+            </div>
+
+            <div class="event-view-summary">
+                @if (_viewEvent.Data.DurationMinutes.HasValue)
+                {
+                    <span class="ev-pill">@_viewEvent.Data.DurationMinutes min</span>
+                }
+                @if (_viewEvent.Data.IsSolo)
+                {
+                    <span class="ev-pill">Solo session</span>
+                }
+                else
+                {
+                    @foreach (var pid in _viewEvent.Data.PartnerIds)
+                    {
+                        <span class="ev-pill ev-pill-partner">@GetPartnerName(pid)</span>
+                    }
+                }
+            </div>
+
+            @if (_viewEvent.Data.ActivityTypeIds.Any())
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Activity Types</div>
+                    <div class="ev-tags">@string.Join(" · ", _viewEvent.Data.ActivityTypeIds.Select(id => GetLookupName(id)))</div>
+                </div>
+            }
+
+            @if (_viewEvent.Data.PositionIds.Any())
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Positions</div>
+                    <div class="ev-tags">@string.Join(" · ", _viewEvent.Data.PositionIds.Select(id => GetLookupName(id)))</div>
+                </div>
+            }
+
+            @if (_viewEvent.Data.RoleIds.Any())
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Roles</div>
+                    <div class="ev-tags">@string.Join(" · ", _viewEvent.Data.RoleIds.Select(id => GetLookupName(id)))</div>
+                </div>
+            }
+
+            @if (_viewEvent.Data.ContraceptionIds.Any())
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Contraception</div>
+                    <div class="ev-tags">@string.Join(" · ", _viewEvent.Data.ContraceptionIds.Select(id => GetLookupName(id)))</div>
+                </div>
+            }
+
+            @if (_viewEvent.Data.ClimaxIds.Any())
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Climax</div>
+                    <div class="ev-tags">@string.Join(" · ", _viewEvent.Data.ClimaxIds.Select(id => GetLookupName(id)))</div>
+                </div>
+            }
+
+            @if (_viewEvent.Data.LocationId.HasValue)
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Location</div>
+                    <div class="ev-tags">@GetLookupName(_viewEvent.Data.LocationId.Value)</div>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_viewEvent.Data.Notes))
+            {
+                <div class="ev-section">
+                    <div class="ev-section-label">Notes</div>
+                    <div class="ev-notes">@_viewEvent.Data.Notes</div>
+                </div>
+            }
+
+            <div class="event-view-footer">
+                <a class="btn-sm btn-outline" href="/events/@_viewEvent.Id/edit">Edit</a>
+                <button class="btn-sm btn-secondary" @onclick="CloseView">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Delete confirmation modal ───────────────────────────────────── *@
+@if (_deleteTargetId.HasValue)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-box">
+            <p>Delete this event? This cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="DeleteConfirmedAsync">Yes, Delete</button>
+                <button class="btn-secondary" @onclick="() => _deleteTargetId = null">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool _loading = true;
-    private List<ActivitySummary> _events = [];
-    private string _search = string.Empty;
+    private bool _fullHistory;
+    private List<ActivitySummary> _allEvents = [];
+    private List<ActivitySummary> _displayedEvents = [];
+    private ActivitySummary? _viewEvent;
+    private int? _deleteTargetId;
 
-    private IEnumerable<ActivitySummary> Filtered =>
-        string.IsNullOrWhiteSpace(_search)
-            ? _events
-            : _events.Where(e => (e.Data.Title ?? string.Empty).Contains(_search, StringComparison.OrdinalIgnoreCase));
+    private Dictionary<int, string> _lookupNames  = new();
+    private Dictionary<int, string> _partnerNames = new();
 
     protected override void OnInitialized()
     {
@@ -57,13 +197,83 @@ else
     {
         if (!firstRender) return;
 
-        var result = await ActivityService.GetAllAsync();
-        if (result.IsSuccess)
-            _events = result.Value!.OrderByDescending(e => e.OccurredDate).ToList();
+        await LoadLookupsAsync();
+        await LoadEventsAsync();
 
         _loading = false;
         StateHasChanged();
     }
 
-    private void EditEvent(int id) => Nav.NavigateTo($"/events/{id}/edit");
+    private async Task LoadLookupsAsync()
+    {
+        var categories = new[] { "Time of Day", "Activity Type", "Position", "Role", "Contraception", "Climax", "Location" };
+        foreach (var cat in categories)
+        {
+            var result = await LookupService.GetByCategoryNameAsync(cat);
+            if (result.IsSuccess)
+                foreach (var item in result.Value!)
+                    _lookupNames[item.Id] = item.Value;
+        }
+
+        var partners = await PartnerService.GetAllAsync();
+        if (partners.IsSuccess)
+            foreach (var p in partners.Value!)
+                _partnerNames[p.Id] = p.Data.Name ?? "Unknown";
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        var result = await ActivityService.GetAllAsync();
+        if (!result.IsSuccess) return;
+
+        _allEvents = result.Value!.OrderByDescending(e => e.OccurredDate).ToList();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (_fullHistory)
+        {
+            _displayedEvents = _allEvents;
+        }
+        else
+        {
+            var cutoff = DateTime.Today.AddDays(-30);
+            _displayedEvents = _allEvents.Where(e => e.OccurredDate >= cutoff).ToList();
+        }
+    }
+
+    private void ShowFullHistory()
+    {
+        _fullHistory = true;
+        ApplyFilter();
+    }
+
+    private string GetLookupName(int id) =>
+        _lookupNames.TryGetValue(id, out var name) ? name : id.ToString();
+
+    private string GetPartnerName(int id) =>
+        _partnerNames.TryGetValue(id, out var name) ? name : "Unknown";
+
+    private string GetTimeOfDayLabel(int? id) =>
+        id.HasValue && _lookupNames.TryGetValue(id.Value, out var name) ? $" - {name}" : string.Empty;
+
+    private void NavigateToEdit(int id) => Nav.NavigateTo($"/events/{id}/edit");
+
+    private void OpenView(ActivitySummary ev) => _viewEvent = ev;
+    private void CloseView() => _viewEvent = null;
+
+    private void ConfirmDelete(int id) => _deleteTargetId = id;
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (!_deleteTargetId.HasValue) return;
+        var result = await ActivityService.DeleteAsync(_deleteTargetId.Value);
+        if (result.IsSuccess)
+        {
+            _allEvents.RemoveAll(e => e.Id == _deleteTargetId.Value);
+            ApplyFilter();
+        }
+        _deleteTargetId = null;
+    }
 }

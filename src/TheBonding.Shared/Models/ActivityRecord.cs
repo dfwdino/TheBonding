@@ -12,22 +12,37 @@ public class ActivityRecord
     /// <summary>ISO-8601 date string (yyyy-MM-dd). Also stored plaintext in entity for sorting.</summary>
     public string OccurredDate { get; set; } = string.Empty;
 
-    /// <summary>LookupItem.Ids from the Activity Type category. Multiple allowed.</summary>
-    public List<int> ActivityTypeIds { get; set; } = [];
-
-    /// <summary>PartnerId — redundant with entity column, included here for export completeness.</summary>
-    public int? PartnerId { get; set; }
-
     public int? DurationMinutes { get; set; }
 
-    /// <summary>LookupItem.Id from the Location category. Null if not set.</summary>
-    public int? LocationId { get; set; }
+    /// <summary>LookupItem.Id from the Time of Day category.</summary>
+    public int? TimeOfDayId { get; set; }
 
-    /// <summary>LookupItem.Id from the Mood category. Null if not set.</summary>
-    public int? MoodId { get; set; }
+    /// <summary>True when this was a solo session — no partner involved.</summary>
+    public bool IsSolo { get; set; }
 
-    /// <summary>LookupItem.Ids from the Contraception category. Multiple allowed.</summary>
+    /// <summary>Partner IDs involved in this event. Empty when IsSolo = true.</summary>
+    public List<int> PartnerIds { get; set; } = [];
+
+    /// <summary>Kept for backward compatibility with records saved before multi-partner support.</summary>
+    public int? PartnerId { get; set; }
+
+    /// <summary>LookupItem.Ids from the Activity Type category.</summary>
+    public List<int> ActivityTypeIds { get; set; } = [];
+
+    /// <summary>LookupItem.Ids from the Position category.</summary>
+    public List<int> PositionIds { get; set; } = [];
+
+    /// <summary>LookupItem.Ids from the Role category.</summary>
+    public List<int> RoleIds { get; set; } = [];
+
+    /// <summary>LookupItem.Ids from the Contraception category.</summary>
     public List<int> ContraceptionIds { get; set; } = [];
+
+    /// <summary>LookupItem.Ids from the Climax category.</summary>
+    public List<int> ClimaxIds { get; set; } = [];
+
+    /// <summary>LookupItem.Id from the Location category.</summary>
+    public int? LocationId { get; set; }
 
     /// <summary>1–5 star rating. Null if not rated.</summary>
     public int? Rating { get; set; }

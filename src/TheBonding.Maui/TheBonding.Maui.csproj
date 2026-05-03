@@ -22,8 +22,9 @@
         <ApplicationId>com.thebonding.app</ApplicationId>
 
         <!-- Versions -->
-        <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+        <ApplicationDisplayVersion>1.25.5</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
+		
 
 
         <!-- Windows: run unpackaged (no Store requirement) -->

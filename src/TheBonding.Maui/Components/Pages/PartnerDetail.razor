@@ -3,6 +3,7 @@
 @inject IPartnerService PartnerService
 @inject IPartnerHealthStatusService HealthService
 @inject IActivityService ActivityService
+@inject ILookupService LookupService
 @inject NavigationManager Nav
 
 <div class="page-header">
@@ -100,10 +101,16 @@ else
                 @foreach (var ev in _linkedEvents)
                 {
                     var evId = ev.Id;
+                    var activitySummary = ev.Data.ActivityTypeIds.Any()
+                        ? string.Join(", ", ev.Data.ActivityTypeIds.Select(id => GetLookupName(id)))
+                        : ev.Data.IsSolo ? "Solo" : null;
                     <div class="list-item" @onclick="@(() => EditEvent(evId))">
                         <div class="list-item-main">
-                            <span class="list-item-title">@(string.IsNullOrWhiteSpace(ev.Data.Title) ? "Untitled" : ev.Data.Title)</span>
-                            <span class="list-item-sub">@ev.OccurredDate.ToString("MMM d, yyyy")</span>
+                            <span class="list-item-title">@ev.OccurredDate.ToString("dddd, MMMM d, yyyy")@(GetTimeOfDayLabel(ev.Data.TimeOfDayId))</span>
+                            @if (!string.IsNullOrEmpty(activitySummary))
+                            {
+                                <span class="list-item-sub">@activitySummary@(ev.Data.DurationMinutes.HasValue ? $" · {ev.Data.DurationMinutes} min" : "")</span>
+                            }
                         </div>
                         <span class="list-item-arrow">›</span>
                     </div>
@@ -120,6 +127,7 @@ else
     private PartnerSummary? _partner;
     private List<PartnerHealthStatusSummary> _healthRecords = [];
     private List<ActivitySummary> _linkedEvents = [];
+    private Dictionary<int, string> _lookupNames = new();
 
     protected override void OnInitialized()
     {
@@ -130,6 +138,15 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+
+        var categories = new[] { "Activity Type", "Position", "Role", "Contraception", "Climax", "Time of Day", "Location" };
+        foreach (var cat in categories)
+        {
+            var lu = await LookupService.GetByCategoryNameAsync(cat);
+            if (lu.IsSuccess)
+                foreach (var item in lu.Value!)
+                    _lookupNames[item.Id] = item.Value;
+        }
 
         var partnerResult = await PartnerService.GetByIdAsync(Id);
         if (partnerResult.IsSuccess) _partner = partnerResult.Value;
@@ -145,6 +162,12 @@ else
         _loading = false;
         StateHasChanged();
     }
+
+    private string GetLookupName(int id) =>
+        _lookupNames.TryGetValue(id, out var name) ? name : id.ToString();
+
+    private string GetTimeOfDayLabel(int? id) =>
+        id.HasValue && _lookupNames.TryGetValue(id.Value, out var name) ? $" - {name}" : string.Empty;
 
     private void EditPartner()  => Nav.NavigateTo($"/partners/{Id}/edit");
     private void AddHealth()    => Nav.NavigateTo($"/partners/{Id}/health/new");

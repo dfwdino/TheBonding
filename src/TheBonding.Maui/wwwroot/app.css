@@ -788,31 +788,45 @@ h1:focus {
 }
 
 /* =============================================================
-   Checkbox list (shared component)
+   Checkbox list — wrapping pill layout
    ============================================================= */
 
 .checkbox-list {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.checkbox-list .form-check {
-    display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     gap: 0.4rem;
 }
 
-.checkbox-list .form-check-input {
-    width: 1rem;
-    height: 1rem;
+.checkbox-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    font-size: 0.85rem;
     cursor: pointer;
+    user-select: none;
+    background: #f9f9f9;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.checkbox-pill input[type="checkbox"] {
+    width: 0.85rem;
+    height: 0.85rem;
+    cursor: pointer;
+    accent-color: #1b1b2f;
     flex-shrink: 0;
 }
 
-.checkbox-list .form-check-label {
-    font-size: 0.9rem;
-    cursor: pointer;
+.checkbox-pill:has(input:checked) {
+    background: #1b1b2f;
+    border-color: #1b1b2f;
+    color: #fff;
+}
+
+.checkbox-pill:has(input:checked) input[type="checkbox"] {
+    accent-color: #fff;
 }
 
 /* =============================================================
@@ -883,4 +897,281 @@ h1:focus {
     .flex-column, .navbar-brand {
         padding-left: env(safe-area-inset-left);
     }
+}
+
+/* =============================================================
+   Event list cards (Events page)
+   ============================================================= */
+
+.event-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.event-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.event-card-date {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1b1b2f;
+    margin-bottom: 0.3rem;
+}
+
+.event-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.ev-meta-item { color: #555; }
+
+.ev-badge {
+    display: inline-block;
+    border-radius: 12px;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ev-badge-solo    { background: #e8e8e8; color: #555; }
+.ev-badge-partner { background: #dce9f7; color: #1b6ec2; }
+
+.event-card-tags {
+    font-size: 0.82rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.event-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
+
+/* =============================================================
+   Small outline action buttons
+   ============================================================= */
+
+.btn-sm.btn-outline {
+    background: none;
+    border: 1px solid #1b6ec2;
+    color: #1b6ec2;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-sm.btn-outline:hover { background: #e8f0fb; }
+
+.btn-sm.btn-outline-danger {
+    background: none;
+    border: 1px solid #c0392b;
+    color: #c0392b;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.btn-sm.btn-outline-danger:hover { background: #fdecea; }
+
+/* =============================================================
+   Inline link button
+   ============================================================= */
+
+.btn-link-inline {
+    background: none;
+    border: none;
+    color: #1b6ec2;
+    cursor: pointer;
+    font-size: inherit;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.btn-link-inline:hover { color: #1b1b2f; }
+
+/* =============================================================
+   Event view modal
+   ============================================================= */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-box {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-width: 340px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.event-view-modal { max-width: 520px; }
+
+.event-view-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.event-view-header h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1b1b2f;
+    margin: 0;
+    flex: 1;
+    padding-right: 0.5rem;
+}
+
+.btn-close-modal {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.btn-close-modal:hover { color: #333; }
+
+.event-view-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.ev-pill {
+    display: inline-block;
+    background: #f0f0f0;
+    border-radius: 12px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.82rem;
+    color: #555;
+}
+
+.ev-pill-partner { background: #dce9f7; color: #1b6ec2; }
+
+.ev-section { margin-bottom: 0.6rem; }
+
+.ev-section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    margin-bottom: 0.2rem;
+}
+
+.ev-tags  { font-size: 0.88rem; color: #333; }
+.ev-notes { font-size: 0.88rem; color: #333; white-space: pre-wrap; }
+
+.event-view-footer {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* =============================================================
+   Climax statistics table (Dashboard)
+   ============================================================= */
+
+.climax-stats-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 1.25rem;
+}
+
+.climax-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.climax-stats-table th,
+.climax-stats-table td {
+    padding: 0.4rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.climax-stats-table th {
+    font-weight: 600;
+    color: #555;
+    background: #f8f8fa;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.climax-stats-table th:not(:first-child),
+.climax-stats-table td:not(:first-child) {
+    text-align: center;
+    font-weight: 600;
+    color: #1b1b2f;
+}
+
+.climax-stats-table td:first-child {
+    color: #666;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    font-weight: normal;
+}
+
+.climax-stats-table tbody tr:hover { background: #f9f9fc; }
+
+/* =============================================================
+   Collapsible section toggle (EventForm)
+   ============================================================= */
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #e8e8e8;
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    text-align: left;
+    margin-bottom: 0.5rem;
+}
+
+.section-toggle:hover { color: #1b1b2f; }
+
+.section-toggle-icon {
+    font-size: 0.7rem;
+    color: #aaa;
 }

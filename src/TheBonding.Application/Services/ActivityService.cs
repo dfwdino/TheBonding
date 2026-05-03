@@ -71,9 +71,12 @@ public sealed class ActivityService : IActivityService
             return Result.Failure<int>("Invalid occurred date format.");
 
         var now = DateTime.UtcNow;
+        // Primary partner: first in PartnerIds list, or legacy PartnerId for old records
+        var primaryPartnerId = record.PartnerIds.Count > 0 ? record.PartnerIds[0] : record.PartnerId;
+
         var activity = new Activity
         {
-            PartnerId    = record.PartnerId,
+            PartnerId    = primaryPartnerId,
             DataBlob     = _encryption.EncryptBlob(record, key2),
             OccurredDate = occurredDate,
             CreatedDate  = now
@@ -81,8 +84,10 @@ public sealed class ActivityService : IActivityService
 
         var id = await _repo.CreateAsync(activity);
 
-        // Update partner's LastUsedDate if a partner is linked
-        if (record.PartnerId.HasValue)
+        // Update LastUsedDate for all partners involved
+        foreach (var pid in record.PartnerIds)
+            await _partnerRepo.UpdateLastUsedDateAsync(pid, now);
+        if (record.PartnerIds.Count == 0 && record.PartnerId.HasValue)
             await _partnerRepo.UpdateLastUsedDateAsync(record.PartnerId.Value, now);
 
         return Result.Success(id);
@@ -103,15 +108,20 @@ public sealed class ActivityService : IActivityService
         if (existing == null)
             return Result.Failure("Activity not found.");
 
-        existing.PartnerId    = record.PartnerId;
+        var primaryPartnerId = record.PartnerIds.Count > 0 ? record.PartnerIds[0] : record.PartnerId;
+
+        existing.PartnerId    = primaryPartnerId;
         existing.DataBlob     = _encryption.EncryptBlob(record, key2);
         existing.OccurredDate = occurredDate;
 
         await _repo.UpdateAsync(existing);
 
-        // Update partner's LastUsedDate if a partner is linked
-        if (record.PartnerId.HasValue)
-            await _partnerRepo.UpdateLastUsedDateAsync(record.PartnerId.Value, DateTime.UtcNow);
+        // Update LastUsedDate for all partners involved
+        var now = DateTime.UtcNow;
+        foreach (var pid in record.PartnerIds)
+            await _partnerRepo.UpdateLastUsedDateAsync(pid, now);
+        if (record.PartnerIds.Count == 0 && record.PartnerId.HasValue)
+            await _partnerRepo.UpdateLastUsedDateAsync(record.PartnerId.Value, now);
 
         return Result.Success();
     }
