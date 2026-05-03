@@ -1,0 +1,168 @@
+@page "/profile"
+@inject IAuthService AuthService
+@inject IUserProfileService ProfileService
+@inject ILookupService LookupService
+@inject IUserHealthStatusService HealthService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <h1 class="page-title">My Profile</h1>
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <!-- Profile fields -->
+    <div class="form-page">
+        @if (!string.IsNullOrEmpty(_error))   { <div class="error-message">@_error</div>   }
+        @if (!string.IsNullOrEmpty(_success)) { <div class="success-message">@_success</div> }
+
+        <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" class="form-control" @bind="_model.DisplayName" placeholder="Your name (optional)" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" class="form-control" @bind="_dateOfBirth" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Gender Identity</label>
+            <select class="form-control" @bind="_genderIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _genders)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Sexual Orientation</label>
+            <select class="form-control" @bind="_orientationIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _orientations)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="3" @bind="_model.Notes"
+                      placeholder="Private notes about yourself…"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveProfileAsync" disabled="@_saving">
+                @(_saving ? "Saving…" : "Save Profile")
+            </button>
+        </div>
+    </div>
+
+    <!-- My STI/STD Health History -->
+    <div class="detail-section" style="margin-top:1.5rem">
+        <div class="section-header">
+            <span>My STI/STD History</span>
+            <a href="/my-health/new" class="btn-add-small">+ Log Test</a>
+        </div>
+
+        @if (_healthRecords.Count == 0)
+        {
+            <p class="empty-state-small">No test records yet. Tap <strong>+ Log Test</strong> to add one.</p>
+        }
+        else
+        {
+            <div class="list-card">
+                @foreach (var h in _healthRecords)
+                {
+                    var hid = h.Id;
+                    <div class="list-item" @onclick="@(() => EditHealth(hid))">
+                        <div class="list-item-main">
+                            <span class="list-item-title">@h.TestedDate.ToString("MMM d, yyyy")</span>
+                            @if (!string.IsNullOrWhiteSpace(h.Data.Result))
+                            {
+                                <span class="list-item-sub">@h.Data.Result</span>
+                            }
+                        </div>
+                        <span class="list-item-arrow">›</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<!-- Spinner overlay while loading health data -->
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _error   = string.Empty;
+    private string _success = string.Empty;
+
+    private UserProfileRecord _model = new();
+    private DateTime? _dateOfBirth;
+    private string _genderIdStr      = string.Empty;
+    private string _orientationIdStr = string.Empty;
+
+    private List<LookupItemRecord>         _genders       = [];
+    private List<LookupItemRecord>         _orientations  = [];
+    private List<UserHealthStatusSummary>  _healthRecords = [];
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var g = await LookupService.GetByCategoryNameAsync("Gender Identity");
+        if (g.IsSuccess) _genders = g.Value!.ToList();
+
+        var o = await LookupService.GetByCategoryNameAsync("Sexual Orientation");
+        if (o.IsSuccess) _orientations = o.Value!.ToList();
+
+        var profileResult = await ProfileService.GetAsync();
+        if (profileResult.IsSuccess && profileResult.Value is not null)
+        {
+            _model = profileResult.Value;
+            if (!string.IsNullOrEmpty(_model.DateOfBirth) &&
+                DateTime.TryParse(_model.DateOfBirth, out var dob))
+                _dateOfBirth = dob;
+            _genderIdStr      = _model.GenderIdentityId?.ToString()    ?? string.Empty;
+            _orientationIdStr = _model.SexualOrientationId?.ToString() ?? string.Empty;
+        }
+
+        var healthResult = await HealthService.GetAllAsync();
+        if (healthResult.IsSuccess)
+            _healthRecords = [.. healthResult.Value!.OrderByDescending(h => h.TestedDate)];
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        _error = _success = string.Empty;
+        _model.DateOfBirth         = _dateOfBirth?.ToString("yyyy-MM-dd");
+        _model.GenderIdentityId    = int.TryParse(_genderIdStr,      out var gid) ? gid : (int?)null;
+        _model.SexualOrientationId = int.TryParse(_orientationIdStr, out var oid) ? oid : (int?)null;
+
+        _saving = true;
+        var result = await ProfileService.SaveAsync(_model);
+        _saving = false;
+
+        if (result.IsSuccess) _success = "Profile saved.";
+        else                  _error   = result.Error ?? "Save failed.";
+    }
+
+    private void EditHealth(int id) => Nav.NavigateTo($"/my-health/{id}/edit");
+}

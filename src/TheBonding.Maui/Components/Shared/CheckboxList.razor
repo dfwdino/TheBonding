@@ -1,0 +1,31 @@
+<div class="checkbox-list">
+    @foreach (var item in Items)
+    {
+        <div class="form-check">
+            <input type="checkbox"
+                   class="form-check-input"
+                   id="chk_@item.Id"
+                   checked="@SelectedIds.Contains(item.Id)"
+                   @onchange="() => Toggle(item.Id)" />
+            <label class="form-check-label" for="chk_@item.Id">@item.Value</label>
+        </div>
+    }
+    @if (!Items.Any())
+    {
+        <p class="text-muted small">No options available. Add some in Manage Lists.</p>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<LookupItemRecord> Items       { get; set; } = [];
+    [Parameter] public List<int>                       SelectedIds { get; set; } = [];
+    [Parameter] public EventCallback<List<int>>        SelectedIdsChanged { get; set; }
+
+    private async Task Toggle(int id)
+    {
+        var updated = new List<int>(SelectedIds);
+        if (updated.Contains(id)) updated.Remove(id);
+        else updated.Add(id);
+        await SelectedIdsChanged.InvokeAsync(updated);
+    }
+}

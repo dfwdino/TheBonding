@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TheBonding.Application/TheBonding.Application.csproj" />
+    <Project Path="src/TheBonding.Domain/TheBonding.Domain.csproj" />
+    <Project Path="src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj" />
+    <Project Path="src/TheBonding.Maui/TheBonding.Maui.csproj" />
+    <Project Path="src/TheBonding.Shared/TheBonding.Shared.csproj" />
+  </Folder>
+</Solution>

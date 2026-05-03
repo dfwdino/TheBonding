@@ -1,0 +1,220 @@
+@page "/lookups"
+@using TheBonding.Domain.Entities
+@inject IAuthService AuthService
+@inject ILookupService LookupService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <h1 class="page-title">Manage Lists</h1>
+</div>
+
+<p class="text-muted small">Add, rename, or remove values used throughout the app. System defaults are pre-loaded but can be edited or deleted.</p>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    @foreach (var cat in _categories)
+    {
+        <div class="lookup-category">
+            <div class="section-header">
+                <span>@cat.Name</span>
+                <button class="btn-add-small" @onclick="() => BeginAddItem(cat.Id)">+ Add</button>
+            </div>
+
+            @if (!_itemsByCategory.TryGetValue(cat.Id, out var items) || items.Count == 0)
+            {
+                <p class="empty-state-small">No items yet.</p>
+            }
+            else
+            {
+                <div class="list-card">
+                    @foreach (var item in items)
+                    {
+                        @if (_editingItemId == item.Id)
+                        {
+                            <div class="list-item-edit">
+                                <input type="text" class="form-control" @bind="_editValue" @onkeydown="OnEditKeyDown" />
+                                <button class="btn-sm btn-primary" @onclick="() => SaveItemAsync(item.Id, item.SortOrder)">Save</button>
+                                <button class="btn-sm btn-secondary" @onclick="CancelEdit">Cancel</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="list-item">
+                                <span class="list-item-title">@item.Value</span>
+                                <div class="list-item-actions">
+                                    <button class="btn-icon-sm" @onclick="() => BeginEditItem(item.Id, item.Value)" title="Edit">✎</button>
+                                    <button class="btn-icon-sm btn-icon-danger" @onclick="() => DeleteItemAsync(item.Id)" title="Delete">✕</button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            @if (_addingCategoryId == cat.Id)
+            {
+                <div class="list-item-edit add-item-row">
+                    <input type="text" class="form-control" @bind="_newItemValue"
+                           @onkeydown="OnAddKeyDown"
+                           placeholder="New value…" />
+                    <button class="btn-sm btn-primary" @onclick="CommitAddItemAsync">Add</button>
+                    <button class="btn-sm btn-secondary" @onclick="CancelAdd">Cancel</button>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-message" style="margin-top:1rem">@_error</div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private string _error = string.Empty;
+
+    private List<LookupCategory>                      _categories      = [];
+    private Dictionary<int, List<LookupItemRecord>>   _itemsByCategory = [];
+
+    private int?   _editingItemId;
+    private string _editValue = string.Empty;
+
+    private int?   _addingCategoryId;
+    private string _newItemValue = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await ReloadAsync();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var catResult = await LookupService.GetCategoriesAsync();
+        if (!catResult.IsSuccess) return;
+        _categories = catResult.Value!.ToList();
+
+        _itemsByCategory.Clear();
+        foreach (var cat in _categories)
+        {
+            var items = await LookupService.GetByCategoryIdAsync(cat.Id);
+            _itemsByCategory[cat.Id] = items.IsSuccess ? items.Value!.ToList() : [];
+        }
+    }
+
+    // ── Edit existing ─────────────────────────────────────────────────────────
+
+    private void BeginEditItem(int id, string current)
+    {
+        _editingItemId    = id;
+        _editValue        = current;
+        _addingCategoryId = null;
+        _error            = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        _editingItemId = null;
+        _editValue     = string.Empty;
+    }
+
+    private async Task SaveItemAsync(int id, int sortOrder)
+    {
+        _error = string.Empty;
+        var value = _editValue.Trim();
+        if (string.IsNullOrEmpty(value)) { _error = "Value cannot be empty."; return; }
+
+        var result = await LookupService.UpdateItemAsync(id, value, sortOrder);
+        if (result.IsSuccess)
+        {
+            _editingItemId = null;
+            await ReloadAsync();
+        }
+        else
+        {
+            _error = result.Error ?? "Save failed.";
+        }
+    }
+
+    private async Task OnEditKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { CancelEdit(); return; }
+
+        if (e.Key == "Enter" && _editingItemId.HasValue)
+        {
+            // Find the sortOrder for the current item
+            foreach (var items in _itemsByCategory.Values)
+            {
+                var found = items.FirstOrDefault(i => i.Id == _editingItemId.Value);
+                if (found != null) { await SaveItemAsync(found.Id, found.SortOrder); return; }
+            }
+        }
+    }
+
+    // ── Add new item ──────────────────────────────────────────────────────────
+
+    private void BeginAddItem(int catId)
+    {
+        _addingCategoryId = catId;
+        _newItemValue     = string.Empty;
+        _editingItemId    = null;
+        _error            = string.Empty;
+    }
+
+    private void CancelAdd()
+    {
+        _addingCategoryId = null;
+        _newItemValue     = string.Empty;
+    }
+
+    private async Task CommitAddItemAsync()
+    {
+        _error = string.Empty;
+        var value = _newItemValue.Trim();
+        if (string.IsNullOrEmpty(value)) { _error = "Value cannot be empty."; return; }
+        if (!_addingCategoryId.HasValue) return;
+
+        var result = await LookupService.AddItemAsync(_addingCategoryId.Value, value);
+        if (result.IsSuccess)
+        {
+            _addingCategoryId = null;
+            _newItemValue     = string.Empty;
+            await ReloadAsync();
+        }
+        else
+        {
+            _error = result.Error ?? "Add failed.";
+        }
+    }
+
+    private async Task OnAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")  await CommitAddItemAsync();
+        else if (e.Key == "Escape") CancelAdd();
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+
+    private async Task DeleteItemAsync(int id)
+    {
+        _error = string.Empty;
+        var result = await LookupService.DeleteItemAsync(id);
+        if (result.IsSuccess)
+            await ReloadAsync();
+        else
+            _error = result.Error ?? "Delete failed.";
+    }
+}

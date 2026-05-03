@@ -1,0 +1,248 @@
+@page "/partners/new"
+@page "/partners/{Id:int}/edit"
+@inject IAuthService AuthService
+@inject IPartnerService PartnerService
+@inject ILookupService LookupService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <button class="btn-back" @onclick="GoBack">‹ Back</button>
+    <h1 class="page-title">@(Id.HasValue ? "Edit Partner" : "New Partner")</h1>
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="form-page">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-message">@_error</div>
+        }
+
+        <div class="form-group">
+            <label class="form-label">Name <span class="required">*</span></label>
+            <input type="text" class="form-control" @bind="_model.Name" placeholder="Partner's name" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Gender Identity</label>
+            <select class="form-control" @bind="_genderIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _genders)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Sexual Orientation</label>
+            <select class="form-control" @bind="_orientationIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _orientations)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Relationship Type</label>
+            <select class="form-control" @bind="_relTypeIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _relationshipTypes)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Met Date</label>
+            <input type="date" class="form-control" @bind="_metDate" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Role Preferences</label>
+            <input type="text" class="form-control" @bind="_model.RolePreferences" placeholder="Optional" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="4" @bind="_model.Notes" placeholder="Private notes…"></textarea>
+        </div>
+
+        @if (Id.HasValue)
+        {
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" @bind="_isActive" /> Active
+                </label>
+            </div>
+        }
+
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @(_saving ? "Saving…" : "Save")
+            </button>
+            @if (Id.HasValue)
+            {
+                <button class="btn-danger" @onclick="ConfirmDelete" disabled="@_saving">Delete</button>
+            }
+        </div>
+
+        @if (_confirmDelete)
+        {
+            <div class="confirm-overlay">
+                <div class="confirm-box">
+                    <p>Delete this partner? All health records will also be deleted.</p>
+                    <p class="text-muted small">If this partner has events, mark them inactive instead.</p>
+                    <div class="confirm-actions">
+                        <button class="btn-danger" @onclick="DeleteAsync">Yes, Delete</button>
+                        <button class="btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _confirmDelete;
+    private string _error    = string.Empty;
+    private bool   _isActive = true;
+
+    private PartnerRecord _model = new();
+
+    // String intermediaries for nullable-int selects
+    private string _genderIdStr      = string.Empty;
+    private string _orientationIdStr = string.Empty;
+    private string _relTypeIdStr     = string.Empty;
+
+    // Nullable date for the date picker
+    private DateTime? _metDate;
+
+    private List<LookupItemRecord> _genders          = [];
+    private List<LookupItemRecord> _orientations      = [];
+    private List<LookupItemRecord> _relationshipTypes = [];
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadLookupsAsync();
+
+        if (Id.HasValue)
+            await LoadExistingAsync();
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        var g = await LookupService.GetByCategoryNameAsync("Gender Identity");
+        if (g.IsSuccess) _genders = g.Value!.ToList();
+
+        var o = await LookupService.GetByCategoryNameAsync("Sexual Orientation");
+        if (o.IsSuccess) _orientations = o.Value!.ToList();
+
+        var r = await LookupService.GetByCategoryNameAsync("Relationship Type");
+        if (r.IsSuccess) _relationshipTypes = r.Value!.ToList();
+    }
+
+    private async Task LoadExistingAsync()
+    {
+        var result = await PartnerService.GetByIdAsync(Id!.Value);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            _error = result.Error ?? "Partner not found.";
+            return;
+        }
+        _model    = result.Value.Data;
+        _isActive = result.Value.IsActive;
+
+        _genderIdStr      = _model.GenderIdentityId?.ToString()    ?? string.Empty;
+        _orientationIdStr = _model.SexualOrientationId?.ToString() ?? string.Empty;
+        _relTypeIdStr     = _model.RelationshipTypeId?.ToString()  ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(_model.MetDate) &&
+            DateTime.TryParse(_model.MetDate, out var met))
+            _metDate = met;
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_model.Name))
+        {
+            _error = "Name is required.";
+            return;
+        }
+
+        _model.GenderIdentityId    = int.TryParse(_genderIdStr,      out var gid) ? gid : (int?)null;
+        _model.SexualOrientationId = int.TryParse(_orientationIdStr, out var oid) ? oid : (int?)null;
+        _model.RelationshipTypeId  = int.TryParse(_relTypeIdStr,     out var rid) ? rid : (int?)null;
+        _model.MetDate             = _metDate?.ToString("yyyy-MM-dd");
+
+        _saving = true;
+        Result result;
+
+        if (Id.HasValue)
+        {
+            result = await PartnerService.UpdateAsync(Id.Value, _model);
+            if (result.IsSuccess)
+                await PartnerService.SetActiveAsync(Id.Value, _isActive);
+        }
+        else
+        {
+            result = await PartnerService.CreateAsync(_model);
+        }
+
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo(Id.HasValue ? $"/partners/{Id}" : "/partners");
+        else
+            _error = result.Error ?? "Save failed.";
+    }
+
+    private void ConfirmDelete() => _confirmDelete = true;
+    private void CancelDelete()  => _confirmDelete = false;
+
+    private async Task DeleteAsync()
+    {
+        _saving = true;
+        var result = await PartnerService.DeleteAsync(Id!.Value);
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo("/partners");
+        else
+        {
+            _error = result.Error ?? "Delete failed.";
+            _confirmDelete = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        if (Id.HasValue)
+            Nav.NavigateTo($"/partners/{Id}");
+        else
+            Nav.NavigateTo("/partners");
+    }
+}

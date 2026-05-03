@@ -1,0 +1,242 @@
+@page "/events/new"
+@page "/events/{Id:int}/edit"
+@inject IAuthService AuthService
+@inject IActivityService ActivityService
+@inject IPartnerService PartnerService
+@inject ILookupService LookupService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <a href="/events" class="btn-back">‹ Back</a>
+    <h1 class="page-title">@(Id.HasValue ? "Edit Event" : "New Event")</h1>
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="form-page">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-message">@_error</div>
+        }
+
+        <div class="form-group">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_model.Title" placeholder="Optional title" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Date <span class="required">*</span></label>
+            <input type="date" class="form-control" @bind="_occurredDate" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Partner</label>
+            <select class="form-control" @bind="_partnerIdStr">
+                <option value="">— None —</option>
+                @foreach (var p in _partners)
+                {
+                    <option value="@p.Id">@p.Data.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Activity Types</label>
+            <CheckboxList Items="@_activityTypes"
+                          SelectedIds="@_model.ActivityTypeIds"
+                          SelectedIdsChanged="OnActivityTypesChanged" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Duration (minutes)</label>
+            <input type="number" class="form-control" @bind="_model.DurationMinutes" min="1" max="9999" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Location</label>
+            <select class="form-control" @bind="_locationIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _locations)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Mood</label>
+            <select class="form-control" @bind="_moodIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _moods)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Contraception</label>
+            <CheckboxList Items="@_contraception"
+                          SelectedIds="@_model.ContraceptionIds"
+                          SelectedIdsChanged="OnContraceptionChanged" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Rating (1–5)</label>
+            <input type="number" class="form-control" @bind="_model.Rating" min="1" max="5" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="4" @bind="_model.Notes" placeholder="Private notes…"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @(_saving ? "Saving…" : "Save")
+            </button>
+            @if (Id.HasValue)
+            {
+                <button class="btn-danger" @onclick="ConfirmDelete" disabled="@_saving">Delete</button>
+            }
+        </div>
+
+        @if (_confirmDelete)
+        {
+            <div class="confirm-overlay">
+                <div class="confirm-box">
+                    <p>Delete this event? This cannot be undone.</p>
+                    <div class="confirm-actions">
+                        <button class="btn-danger" @onclick="DeleteAsync">Yes, Delete</button>
+                        <button class="btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _confirmDelete;
+    private string _error = string.Empty;
+
+    private ActivityRecord _model = new() { ActivityTypeIds = [], ContraceptionIds = [] };
+    private DateTime _occurredDate = DateTime.Today;
+
+    // String intermediaries for nullable-int selects
+    private string _partnerIdStr  = string.Empty;
+    private string _locationIdStr = string.Empty;
+    private string _moodIdStr     = string.Empty;
+
+    private List<PartnerSummary>   _partners      = [];
+    private List<LookupItemRecord> _activityTypes = [];
+    private List<LookupItemRecord> _locations     = [];
+    private List<LookupItemRecord> _moods         = [];
+    private List<LookupItemRecord> _contraception = [];
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadLookupsAsync();
+
+        if (Id.HasValue)
+            await LoadExistingAsync();
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        var partners = await PartnerService.GetAllAsync();
+        if (partners.IsSuccess)
+            _partners = partners.Value!.Where(p => p.IsActive).OrderBy(p => p.Data.Name).ToList();
+
+        var actTypes = await LookupService.GetByCategoryNameAsync("Activity Type");
+        if (actTypes.IsSuccess) _activityTypes = actTypes.Value!.ToList();
+
+        var locs = await LookupService.GetByCategoryNameAsync("Location");
+        if (locs.IsSuccess) _locations = locs.Value!.ToList();
+
+        var moods = await LookupService.GetByCategoryNameAsync("Mood");
+        if (moods.IsSuccess) _moods = moods.Value!.ToList();
+
+        var contra = await LookupService.GetByCategoryNameAsync("Contraception");
+        if (contra.IsSuccess) _contraception = contra.Value!.ToList();
+    }
+
+    private async Task LoadExistingAsync()
+    {
+        var result = await ActivityService.GetByIdAsync(Id!.Value);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            _error = result.Error ?? "Event not found.";
+            return;
+        }
+        _model        = result.Value.Data;
+        _occurredDate = result.Value.OccurredDate;
+
+        _partnerIdStr  = _model.PartnerId?.ToString()  ?? string.Empty;
+        _locationIdStr = _model.LocationId?.ToString() ?? string.Empty;
+        _moodIdStr     = _model.MoodId?.ToString()     ?? string.Empty;
+    }
+
+    private void OnActivityTypesChanged(List<int> ids) { _model.ActivityTypeIds = ids; }
+    private void OnContraceptionChanged(List<int> ids) { _model.ContraceptionIds = ids; }
+
+    private async Task SaveAsync()
+    {
+        _error = string.Empty;
+        _model.OccurredDate = _occurredDate.ToString("yyyy-MM-dd");
+        _model.PartnerId    = int.TryParse(_partnerIdStr,  out var pid) ? pid : (int?)null;
+        _model.LocationId   = int.TryParse(_locationIdStr, out var lid) ? lid : (int?)null;
+        _model.MoodId       = int.TryParse(_moodIdStr,     out var mid) ? mid : (int?)null;
+
+        _saving = true;
+        Result result;
+
+        if (Id.HasValue)
+            result = await ActivityService.UpdateAsync(Id.Value, _model);
+        else
+            result = await ActivityService.CreateAsync(_model);
+
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo("/events");
+        else
+            _error = result.Error ?? "Save failed.";
+    }
+
+    private void ConfirmDelete() => _confirmDelete = true;
+    private void CancelDelete()  => _confirmDelete = false;
+
+    private async Task DeleteAsync()
+    {
+        _saving = true;
+        var result = await ActivityService.DeleteAsync(Id!.Value);
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo("/events");
+        else
+        {
+            _error = result.Error ?? "Delete failed.";
+            _confirmDelete = false;
+        }
+    }
+}

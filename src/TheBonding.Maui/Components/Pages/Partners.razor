@@ -1,0 +1,85 @@
+@page "/partners"
+@inject IAuthService AuthService
+@inject IPartnerService PartnerService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <h1 class="page-title">Partners</h1>
+    <a href="/partners/new" class="btn-add">+ Add</a>
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="filter-row">
+        <input type="text" class="filter-input" placeholder="Search…" @bind="_search" @bind:event="oninput" />
+        <label class="toggle-label">
+            <input type="checkbox" @bind="_showInactive" /> Show inactive
+        </label>
+    </div>
+
+    @if (Filtered.Count == 0)
+    {
+        <p class="empty-state">No partners found. Tap <strong>+ Add</strong> to add one.</p>
+    }
+    else
+    {
+        <div class="list-card">
+            @foreach (var p in Filtered)
+            {
+                var pid = p.Id;
+                <div class="list-item @(p.IsActive ? "" : "inactive")" @onclick="@(() => ViewPartner(pid))">
+                    <div class="list-item-main">
+                        <span class="list-item-title">@p.Data.Name</span>
+                        @if (!p.IsActive)
+                        {
+                            <span class="badge-inactive">Inactive</span>
+                        }
+                        @if (p.LastUsedDate != default)
+                        {
+                            <span class="list-item-sub">Last event: @p.LastUsedDate.ToString("MMM d, yyyy")</span>
+                        }
+                    </div>
+                    <span class="list-item-arrow">›</span>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private List<PartnerSummary> _partners = [];
+    private string _search      = string.Empty;
+    private bool   _showInactive = false;
+
+    private List<PartnerSummary> Filtered =>
+        _partners
+            .Where(p => _showInactive || p.IsActive)
+            .Where(p => string.IsNullOrWhiteSpace(_search) ||
+                        p.Data.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var result = await PartnerService.GetAllAsync();
+        if (result.IsSuccess)
+            _partners = result.Value!.OrderBy(p => p.Data.Name).ToList();
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void ViewPartner(int id) => Nav.NavigateTo($"/partners/{id}");
+}

@@ -1,0 +1,118 @@
+@page "/setup"
+@layout AuthLayout
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+<div class="auth-card">
+    <h2>Welcome to The Bonding</h2>
+    <p class="text-muted mb-4">Create a password to protect your data.</p>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger py-2 mb-3">@_error</div>
+    }
+
+    <div class="form-group">
+        <label for="password" class="form-label">Password</label>
+        <div class="input-group">
+            <input id="password"
+                   type="@(_showPassword ? "text" : "password")"
+                   class="form-control"
+                   placeholder="Min. 8 characters"
+                   @bind="_password"
+                   @bind:event="oninput"
+                   disabled="@_loading" />
+            <button type="button" class="btn btn-outline-secondary"
+                    @onclick="() => _showPassword = !_showPassword">
+                @(_showPassword ? "Hide" : "Show")
+            </button>
+        </div>
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="confirm" class="form-label">Confirm Password</label>
+        <input id="confirm"
+               type="@(_showPassword ? "text" : "password")"
+               class="form-control"
+               placeholder="Re-enter your password"
+               @bind="_confirm"
+               @bind:event="oninput"
+               @onkeyup="HandleKeyUp"
+               disabled="@_loading" />
+    </div>
+
+    <button class="btn btn-primary w-100 mt-4"
+            @onclick="SetupAsync"
+            disabled="@_loading">
+        @if (_loading)
+        {
+            <span>Setting up&#8230;</span>
+        }
+        else
+        {
+            <span>Create Password</span>
+        }
+    </button>
+
+    <div class="mt-4 p-3 rounded" style="background:#fff8e1; font-size:0.82rem; color:#555;">
+        &#9888;&#65039; <strong>Important:</strong> Your password cannot be recovered.
+        If you forget it, all data is permanently lost. There is no reset option by design.
+    </div>
+</div>
+
+@code {
+    private string _password    = string.Empty;
+    private string _confirm     = string.Empty;
+    private string _error       = string.Empty;
+    private bool   _loading     = false;
+    private bool   _showPassword = false;
+
+    protected override void OnInitialized()
+    {
+        // Already set up — skip setup page
+        if (AuthService.IsSetup)
+            Nav.NavigateTo(AuthService.IsUnlocked ? "/dashboard" : "/unlock", replace: true);
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SetupAsync();
+    }
+
+    private async Task SetupAsync()
+    {
+        _error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Password is required.";
+            return;
+        }
+        if (_password.Length < 8)
+        {
+            _error = "Password must be at least 8 characters.";
+            return;
+        }
+        if (_password != _confirm)
+        {
+            _error = "Passwords do not match.";
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var result = await AuthService.SetupAsync(_password);
+            if (result.IsFailure)
+            {
+                _error = result.Error!;
+                return;
+            }
+            Nav.NavigateTo("/dashboard", replace: true);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

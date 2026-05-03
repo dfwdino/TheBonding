@@ -1,0 +1,35 @@
+@page "/"
+@layout AuthLayout
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+<div class="auth-card">
+    @if (!string.IsNullOrEmpty(MauiProgram.StartupError))
+    {
+        <h2>Startup Error</h2>
+        <div class="error-message" style="font-size:0.9rem; word-break:break-all;">
+            @MauiProgram.StartupError
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">Starting up...</p>
+    }
+</div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // If startup failed, stay on this page so the error is visible.
+        if (!string.IsNullOrEmpty(MauiProgram.StartupError)) return;
+
+        if (!AuthService.IsSetup)
+            Nav.NavigateTo("/setup", replace: true);
+        else if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+        else
+            Nav.NavigateTo("/dashboard", replace: true);
+    }
+}

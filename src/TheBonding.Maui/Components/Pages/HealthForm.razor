@@ -1,0 +1,177 @@
+@page "/partners/{PartnerId:int}/health/new"
+@page "/partners/{PartnerId:int}/health/{Id:int}/edit"
+@inject IAuthService AuthService
+@inject IPartnerHealthStatusService HealthService
+@inject ILookupService LookupService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <button class="btn-back" @onclick="GoBack">‹ Back</button>
+    <h1 class="page-title">@(Id.HasValue ? "Edit Health Record" : "New Health Record")</h1>
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="form-page">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-message">@_error</div>
+        }
+
+        <div class="form-group">
+            <label class="form-label">Test Date <span class="required">*</span></label>
+            <input type="date" class="form-control" @bind="_testedDate" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Test Type</label>
+            <select class="form-control" @bind="_testTypeIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _testTypes)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Result</label>
+            <select class="form-control" @bind="_resultIdStr">
+                <option value="">— Select —</option>
+                @foreach (var item in _resultItems)
+                {
+                    <option value="@item.Id">@item.Value</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="3" @bind="_model.Notes" placeholder="Optional notes…"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @(_saving ? "Saving…" : "Save")
+            </button>
+            @if (Id.HasValue)
+            {
+                <button class="btn-danger" @onclick="ConfirmDelete" disabled="@_saving">Delete</button>
+            }
+        </div>
+
+        @if (_confirmDelete)
+        {
+            <div class="confirm-overlay">
+                <div class="confirm-box">
+                    <p>Delete this health record? This cannot be undone.</p>
+                    <div class="confirm-actions">
+                        <button class="btn-danger" @onclick="DeleteAsync">Yes, Delete</button>
+                        <button class="btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int  PartnerId { get; set; }
+    [Parameter] public int? Id        { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _confirmDelete;
+    private string _error = string.Empty;
+
+    private PartnerHealthStatusRecord _model = new();
+    private DateTime _testedDate    = DateTime.Today;
+    private string   _testTypeIdStr = string.Empty;
+    private string   _resultIdStr   = string.Empty;
+
+    private List<LookupItemRecord> _testTypes   = [];
+    private List<LookupItemRecord> _resultItems = [];
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var types = await LookupService.GetByCategoryNameAsync("Health Test Type");
+        if (types.IsSuccess) _testTypes = types.Value!.ToList();
+
+        var results = await LookupService.GetByCategoryNameAsync("Health Test Result");
+        if (results.IsSuccess) _resultItems = results.Value!.ToList();
+
+        if (Id.HasValue)
+        {
+            var result = await HealthService.GetByIdAsync(Id.Value);
+            if (result.IsSuccess && result.Value is not null)
+            {
+                _model          = result.Value.Data;
+                _testedDate     = result.Value.TestedDate;
+                _testTypeIdStr  = _model.HealthTestTypeId?.ToString() ?? string.Empty;
+                var matched     = _resultItems.FirstOrDefault(r => r.Value == _model.Result);
+                _resultIdStr    = matched?.Id.ToString() ?? string.Empty;
+            }
+            else
+            {
+                _error = "Record not found.";
+            }
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = string.Empty;
+        _model.TestedDate       = _testedDate.ToString("yyyy-MM-dd");
+        _model.HealthTestTypeId = int.TryParse(_testTypeIdStr, out var tid) ? tid : (int?)null;
+        _model.Result           = _resultItems.FirstOrDefault(r => r.Id.ToString() == _resultIdStr)?.Value;
+
+        _saving = true;
+
+        Result result;
+        if (Id.HasValue)
+            result = await HealthService.UpdateAsync(Id.Value, _model);
+        else
+            result = await HealthService.CreateAsync(PartnerId, _model);
+
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo($"/partners/{PartnerId}");
+        else
+            _error = result.Error ?? "Save failed.";
+    }
+
+    private void GoBack()        => Nav.NavigateTo($"/partners/{PartnerId}");
+    private void ConfirmDelete() => _confirmDelete = true;
+    private void CancelDelete()  => _confirmDelete = false;
+
+    private async Task DeleteAsync()
+    {
+        _saving = true;
+        var result = await HealthService.DeleteAsync(Id!.Value);
+        _saving = false;
+
+        if (result.IsSuccess)
+            Nav.NavigateTo($"/partners/{PartnerId}");
+        else
+        {
+            _error = result.Error ?? "Delete failed.";
+            _confirmDelete = false;
+        }
+    }
+}

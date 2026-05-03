@@ -1,0 +1,130 @@
+@page "/unlock"
+@layout AuthLayout
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+@if (_loading)
+{
+    <div class="unlock-spinner-wrap">
+        <div class="unlock-spinner"></div>
+        <p class="unlock-status">Decrypting your data&hellip;</p>
+        <p class="unlock-status-sub">This takes a moment to keep your data safe.</p>
+    </div>
+}
+else
+{
+<div class="auth-card">
+    <h2>Welcome Back</h2>
+
+    @if (_lockedOut)
+    {
+        <div class="error-message" style="margin-bottom:0.75rem">
+            <strong>App locked.</strong><br />
+            Too many failed attempts. Try again at
+            <strong>@_lockoutUntil?.ToLocalTime().ToString("h:mm tt")</strong>.
+        </div>
+        <button class="btn-secondary" style="width:100%;margin-top:0.5rem" @onclick="CheckLockout">
+            Check Again
+        </button>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-message" style="margin-bottom:0.75rem">@_error</div>
+        }
+
+        <div class="form-group">
+            <label class="form-label" for="pwd">Password</label>
+            <div style="display:flex;gap:0.4rem">
+                <input id="pwd"
+                       type="@(_showPassword ? "text" : "password")"
+                       class="form-control"
+                       placeholder="Enter your password"
+                       @bind="_password"
+                       @bind:event="oninput"
+                       @onkeyup="HandleKeyUp"
+                       autofocus />
+                <button type="button" class="btn-secondary"
+                        style="white-space:nowrap;padding:0.45rem 0.75rem"
+                        @onclick="ToggleShow">
+                    @(_showPassword ? "Hide" : "Show")
+                </button>
+            </div>
+        </div>
+
+        <button class="btn-primary" style="width:100%;margin-top:1.25rem"
+                @onclick="UnlockAsync"
+                disabled="@string.IsNullOrWhiteSpace(_password)">
+            Unlock
+        </button>
+    }
+</div>
+}
+
+@code {
+    private string    _password     = string.Empty;
+    private string    _error        = string.Empty;
+    private bool      _loading      = false;
+    private bool      _showPassword = false;
+    private bool      _lockedOut    = false;
+    private DateTime? _lockoutUntil = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthService.IsUnlocked)
+        {
+            Nav.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+        if (!AuthService.IsSetup)
+        {
+            Nav.NavigateTo("/setup", replace: true);
+            return;
+        }
+        await CheckLockout();
+    }
+
+    private async Task CheckLockout()
+    {
+        _lockoutUntil = await AuthService.GetLockoutUntilAsync();
+        _lockedOut    = _lockoutUntil.HasValue && _lockoutUntil.Value > DateTime.UtcNow;
+        StateHasChanged();
+    }
+
+    private void ToggleShow() => _showPassword = !_showPassword;
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await UnlockAsync();
+    }
+
+    private async Task UnlockAsync()
+    {
+        _error = string.Empty;
+        if (string.IsNullOrWhiteSpace(_password)) return;
+
+        _loading = true;
+        StateHasChanged();           // show spinner immediately
+        await Task.Delay(30);        // let the UI repaint before the CPU-heavy PBKDF2 runs
+
+        try
+        {
+            var result = await AuthService.UnlockAsync(_password);
+
+            if (result.IsFailure)
+            {
+                _error    = result.Error!;
+                _password = string.Empty;
+                await CheckLockout();
+                return;
+            }
+
+            Nav.NavigateTo("/dashboard", replace: true);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

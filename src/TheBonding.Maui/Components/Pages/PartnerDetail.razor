@@ -1,0 +1,153 @@
+@page "/partners/{Id:int}"
+@inject IAuthService AuthService
+@inject IPartnerService PartnerService
+@inject IPartnerHealthStatusService HealthService
+@inject IActivityService ActivityService
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <a href="/partners" class="btn-back">‹ Back</a>
+    <h1 class="page-title">@(_partner?.Data.Name ?? "Partner")</h1>
+    @if (_partner is not null)
+    {
+        <button class="btn-icon" @onclick="EditPartner">Edit</button>
+    }
+</div>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (_partner is null)
+{
+    <p class="error-message">Partner not found.</p>
+}
+else
+{
+    @if (!_partner.IsActive)
+    {
+        <div class="info-banner">This partner is marked inactive.</div>
+    }
+
+    <!-- Partner Info -->
+    <div class="detail-section">
+        <div class="section-header"><span>Details</span></div>
+        <div class="detail-card">
+            @if (!string.IsNullOrWhiteSpace(_partner.Data.Notes))
+            {
+                <div class="detail-row">
+                    <span class="detail-label">Notes</span>
+                    <span class="detail-value">@_partner.Data.Notes</span>
+                </div>
+            }
+            @if (_partner.LastUsedDate != default)
+            {
+                <div class="detail-row">
+                    <span class="detail-label">Last Event</span>
+                    <span class="detail-value">@_partner.LastUsedDate.ToString("MMM d, yyyy")</span>
+                </div>
+            }
+            <div class="detail-row">
+                <span class="detail-label">Added</span>
+                <span class="detail-value">@_partner.CreatedDate.ToString("MMM d, yyyy")</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Status -->
+    <div class="detail-section">
+        <div class="section-header">
+            <span>Health Status</span>
+            <button class="btn-add-small" @onclick="AddHealth">+ Add</button>
+        </div>
+
+        @if (_healthRecords.Count == 0)
+        {
+            <p class="empty-state-small">No health records yet.</p>
+        }
+        else
+        {
+            <div class="list-card">
+                @foreach (var h in _healthRecords)
+                {
+                    var hid = h.Id;
+                    <div class="list-item" @onclick="@(() => EditHealth(hid))">
+                        <div class="list-item-main">
+                            <span class="list-item-title">@h.TestedDate.ToString("MMM d, yyyy")</span>
+                            @if (!string.IsNullOrWhiteSpace(h.Data.Result))
+                            {
+                                <span class="list-item-sub">@h.Data.Result</span>
+                            }
+                        </div>
+                        <span class="list-item-arrow">›</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Linked Events -->
+    <div class="detail-section">
+        <div class="section-header"><span>Events</span></div>
+
+        @if (_linkedEvents.Count == 0)
+        {
+            <p class="empty-state-small">No events linked to this partner.</p>
+        }
+        else
+        {
+            <div class="list-card">
+                @foreach (var ev in _linkedEvents)
+                {
+                    var evId = ev.Id;
+                    <div class="list-item" @onclick="@(() => EditEvent(evId))">
+                        <div class="list-item-main">
+                            <span class="list-item-title">@(string.IsNullOrWhiteSpace(ev.Data.Title) ? "Untitled" : ev.Data.Title)</span>
+                            <span class="list-item-sub">@ev.OccurredDate.ToString("MMM d, yyyy")</span>
+                        </div>
+                        <span class="list-item-arrow">›</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private bool _loading = true;
+    private PartnerSummary? _partner;
+    private List<PartnerHealthStatusSummary> _healthRecords = [];
+    private List<ActivitySummary> _linkedEvents = [];
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var partnerResult = await PartnerService.GetByIdAsync(Id);
+        if (partnerResult.IsSuccess) _partner = partnerResult.Value;
+
+        var healthResult = await HealthService.GetByPartnerAsync(Id);
+        if (healthResult.IsSuccess)
+            _healthRecords = [.. healthResult.Value!.OrderByDescending(h => h.TestedDate)];
+
+        var eventsResult = await ActivityService.GetByPartnerAsync(Id);
+        if (eventsResult.IsSuccess)
+            _linkedEvents = [.. eventsResult.Value!.OrderByDescending(e => e.OccurredDate)];
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void EditPartner()  => Nav.NavigateTo($"/partners/{Id}/edit");
+    private void AddHealth()    => Nav.NavigateTo($"/partners/{Id}/health/new");
+    private void EditHealth(int hid) => Nav.NavigateTo($"/partners/{Id}/health/{hid}/edit");
+    private void EditEvent(int eid)  => Nav.NavigateTo($"/events/{eid}/edit");
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <!--
+        Discreet intimacy icon: a stylized flame with a small teardrop inner glow.
+        A flame universally suggests heat, passion, desire — nothing explicit.
+        Outer flame: warm amber/orange. Inner glow: soft gold.
+    -->
+
+    <!-- Outer flame -->
+    <path d="M 228,60
+             C 228,60 310,130 320,200
+             C 330,255 300,285 285,300
+             C 295,265 280,245 265,255
+             C 285,210 260,165 228,130
+             C 196,165 171,210 191,255
+             C 176,245 161,265 171,300
+             C 156,285 126,255 136,200
+             C 146,130 228,60 228,60 Z"
+          fill="#e8883a"/>
+
+    <!-- Mid flame -->
+    <path d="M 228,140
+             C 228,140 285,190 290,235
+             C 295,268 275,290 260,302
+             C 268,278 255,262 244,270
+             C 258,242 248,208 228,185
+             C 208,208 198,242 212,270
+             C 201,262 188,278 196,302
+             C 181,290 161,268 166,235
+             C 171,190 228,140 228,140 Z"
+          fill="#f5a623"/>
+
+    <!-- Inner glow / teardrop -->
+    <path d="M 228,210
+             C 228,210 255,240 255,268
+             C 255,290 243,305 228,310
+             C 213,305 201,290 201,268
+             C 201,240 228,210 228,210 Z"
+          fill="#fde68a"
+          opacity="0.9"/>
+</svg>
