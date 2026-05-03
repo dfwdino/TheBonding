@@ -10,6 +10,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   APP_NAME: TheBonding
   PROJECT: src/TheBonding.Maui/TheBonding.Maui.csproj
+  SOLUTION: TheBonding.slnx
 
 jobs:
   get-version:
@@ -32,20 +33,31 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.version }}
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
+
     - name: Install MAUI Android workload
       run: dotnet workload install maui-android
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-android
+
+    - name: Restore all projects
+      run: |
+        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
+        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
+        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
+        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
+        dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-android
+
     - name: Build Android
       run: dotnet build ${{ env.PROJECT }} -p:TargetFramework=net10.0-android --no-restore -c Release
+
     - name: Rename APK
       run: |
         mkdir -p artifacts
         cp src/TheBonding.Maui/bin/Release/net10.0-android/*.apk "artifacts/${{ env.APP_NAME }} - ${{ env.VERSION }}.apk"
+
     - name: Upload Android APK
       uses: actions/upload-artifact@v4
       with:
@@ -59,18 +71,29 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.version }}
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
+
     - name: Install MAUI Windows workload
       run: dotnet workload install maui
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-windows10.0.19041.0 -r win-x64
+
+    - name: Restore all projects
+      run: |
+        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
+        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
+        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
+        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
+        dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-windows10.0.19041.0 -r win-x64
+
     - name: Build Windows
       run: dotnet build ${{ env.PROJECT }} -p:TargetFramework=net10.0-windows10.0.19041.0 -r win-x64 -p:PublishReadyToRun=false --no-restore -c Release
+
     - name: Zip Windows build
       run: Compress-Archive -Path "src/TheBonding.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/*" -DestinationPath "${{ env.APP_NAME }} - ${{ env.VERSION }}.zip"
+
     - name: Upload Windows build
       uses: actions/upload-artifact@v4
       with:
@@ -91,11 +114,13 @@ jobs:
       with:
         name: android-apk
         path: artifacts/android
+
     - name: Download Windows build
       uses: actions/download-artifact@v4
       with:
         name: windows-app
         path: artifacts/windows
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
