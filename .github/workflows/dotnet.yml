@@ -10,7 +10,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   APP_NAME: TheBonding
   PROJECT: src/TheBonding.Maui/TheBonding.Maui.csproj
-  SOLUTION: TheBonding.slnx
 
 jobs:
   get-version:
@@ -42,16 +41,8 @@ jobs:
     - name: Install MAUI Android workload
       run: dotnet workload install maui-android
 
-    - name: Restore all projects
-      run: |
-        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
-        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
-        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
-        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
-        dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-android
-
     - name: Build Android
-      run: dotnet build ${{ env.PROJECT }} -p:TargetFramework=net10.0-android --no-restore -c Release
+      run: dotnet build ${{ env.PROJECT }} -f net10.0-android -c Release
 
     - name: Rename APK
       run: |
@@ -80,16 +71,8 @@ jobs:
     - name: Install MAUI Windows workload
       run: dotnet workload install maui
 
-    - name: Restore all projects
-      run: |
-        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
-        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
-        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
-        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
-        dotnet restore ${{ env.PROJECT }} -p:TargetFramework=net10.0-windows10.0.19041.0 -r win-x64
-
     - name: Build Windows
-      run: dotnet build ${{ env.PROJECT }} -p:TargetFramework=net10.0-windows10.0.19041.0 -r win-x64 -p:PublishReadyToRun=false --no-restore -c Release
+      run: dotnet build ${{ env.PROJECT }} -f net10.0-windows10.0.19041.0 -r win-x64 -c Release
 
     - name: Zip Windows build
       run: Compress-Archive -Path "src/TheBonding.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/*" -DestinationPath "${{ env.APP_NAME }} - ${{ env.VERSION }}.zip"
