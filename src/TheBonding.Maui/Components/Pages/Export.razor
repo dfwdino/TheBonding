@@ -1,0 +1,123 @@
+@page "/export"
+@using System.Text.Json
+@inject IAuthService AuthService
+@inject IActivityService ActivityService
+@inject IPartnerService PartnerService
+@inject IPartnerHealthStatusService HealthService
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <h1 class="page-title">Export Data</h1>
+</div>
+
+<p class="text-muted">
+    All of your data is decrypted in this app and exported as a single JSON file.
+    The file is generated entirely on your device — nothing is sent anywhere.
+</p>
+
+<div class="export-warning">
+    <strong>⚠ Important:</strong> The exported file contains your <em>decrypted</em> data
+    in plain text. Store it somewhere safe and do not share it with anyone.
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="error-message" style="margin-top:1rem">@_error</div>
+}
+
+<div class="form-actions" style="margin-top:1.5rem">
+    <button class="btn-primary" @onclick="ExportAsync" disabled="@_busy">
+        @(_busy ? "Preparing…" : "Download JSON Export")
+    </button>
+</div>
+
+@if (_exported)
+{
+    <p class="success-message" style="margin-top:1rem">
+        ✓ Export ready — your download should have started. If not, try again.
+    </p>
+}
+
+@code {
+    private bool _busy;
+    private bool _exported;
+    private string _error = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    private async Task ExportAsync()
+    {
+        _busy    = true;
+        _exported = false;
+        _error   = string.Empty;
+
+        try
+        {
+            // Load all decrypted data
+            var activitiesResult = await ActivityService.GetAllAsync();
+            var partnersResult   = await PartnerService.GetAllAsync();
+
+            if (!activitiesResult.IsSuccess)
+            {
+                _error = activitiesResult.Error ?? "Failed to load events.";
+                return;
+            }
+
+            if (!partnersResult.IsSuccess)
+            {
+                _error = partnersResult.Error ?? "Failed to load partners.";
+                return;
+            }
+
+            // Load health records for every partner
+            var healthByPartner = new Dictionary<int, object>();
+            foreach (var p in partnersResult.Value!)
+            {
+                var hr = await HealthService.GetByPartnerAsync(p.Id);
+                if (hr.IsSuccess)
+                    healthByPartner[p.Id] = hr.Value!;
+            }
+
+            var export = new
+            {
+                ExportedAt = DateTime.UtcNow,
+                Note       = "This file contains your decrypted data. Keep it private.",
+                Events     = activitiesResult.Value!.Select(a => new
+                {
+                    a.Id,
+                    OccurredDate = a.OccurredDate,
+                    a.CreatedDate,
+                    Record = a.Data
+                }),
+                Partners   = partnersResult.Value!.Select(p => new
+                {
+                    p.Id,
+                    p.IsActive,
+                    p.LastUsedDate,
+                    p.CreatedDate,
+                    Record        = p.Data,
+                    HealthRecords = healthByPartner.TryGetValue(p.Id, out var hr) ? hr : Array.Empty<object>()
+                }),
+            };
+
+            var json = JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true });
+            var filename = $"bonding-export-{DateTime.Now:yyyy-MM-dd}.json";
+
+            await JS.InvokeVoidAsync("downloadTextFile", filename, json);
+            _exported = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

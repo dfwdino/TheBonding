@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IActivityRepository,            ActivityRepository>();
         services.AddSingleton<ILookupRepository,              LookupRepository>();
         services.AddSingleton<IUserHealthStatusRepository,    UserHealthStatusRepository>();
+        services.AddSingleton<IDataManagementService,         DataManagementService>();
 
         return services;
     }

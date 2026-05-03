@@ -1,0 +1,214 @@
+@page "/data-privacy"
+@inject IAuthService AuthService
+@inject IDataManagementService DataManagement
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <h1 class="page-title">Data &amp; Privacy</h1>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="error-message" style="margin-top:1rem">@_error</div>
+}
+
+@if (!string.IsNullOrEmpty(_success))
+{
+    <p class="success-message" style="margin-top:1rem">✓ @_success</p>
+}
+
+@* ── Change Password ── *@
+<div class="settings-card" style="margin-top:1rem">
+    <h2 class="settings-card-title">Change Password</h2>
+    <p class="text-muted" style="margin-bottom:1rem">
+        Your encrypted data is re-wrapped under the new password. Nothing else changes.
+    </p>
+
+    <div class="form-group">
+        <label class="form-label">Current password</label>
+        <input type="password" class="form-control" @bind="_currentPwd" @bind:event="oninput" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">New password</label>
+        <input type="password" class="form-control" @bind="_newPwd" @bind:event="oninput" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Confirm new password</label>
+        <input type="password" class="form-control" @bind="_confirmPwd" @bind:event="oninput" />
+    </div>
+
+    <div class="form-actions">
+        <button class="btn-primary" @onclick="DoChangePasswordAsync"
+                disabled="@(_busy || string.IsNullOrWhiteSpace(_currentPwd) || string.IsNullOrWhiteSpace(_newPwd))">
+            @(_busy ? "Saving…" : "Change Password")
+        </button>
+    </div>
+</div>
+
+@* ── Clear Personal Data ── *@
+<div class="danger-zone-card">
+    <h2 class="danger-zone-title">Clear Personal Data</h2>
+    <p class="text-muted">
+        Permanently deletes all of your events, partners, health records, and profile.
+        Your account and lookup lists are kept — you will stay logged in.
+        <strong>This cannot be undone.</strong>
+    </p>
+    <button class="btn-danger" @onclick="() => _confirmClear = true" disabled="@_busy">
+        Clear Personal Data
+    </button>
+</div>
+
+@* ── Start Over ── *@
+<div class="danger-zone-card" style="margin-top:1.5rem">
+    <h2 class="danger-zone-title">Start Over</h2>
+    <p class="text-muted">
+        Wipes everything — events, partners, health records, profile, lookup lists,
+        and your account. The app returns to first-launch state and you will need to
+        create a new account. <strong>This cannot be undone.</strong>
+    </p>
+    <button class="btn-danger" @onclick="() => _confirmReset = true" disabled="@_busy">
+        Start Over
+    </button>
+</div>
+
+@* ── Clear Personal Data confirmation ── *@
+@if (_confirmClear)
+{
+    <div class="confirm-overlay" @onclick="() => _confirmClear = false">
+        <div class="confirm-box" @onclick:stopPropagation="true">
+            <p class="confirm-message">
+                <strong>Delete all personal data?</strong><br />
+                Events, partners, health records, and your profile will be permanently removed.
+                Your account and lookup lists will remain.
+            </p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="DoClearAsync" disabled="@_busy">
+                    @(_busy ? "Clearing…" : "Yes, delete everything")
+                </button>
+                <button class="btn-secondary" @onclick="() => _confirmClear = false" disabled="@_busy">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Start Over confirmation ── *@
+@if (_confirmReset)
+{
+    <div class="confirm-overlay" @onclick="() => _confirmReset = false">
+        <div class="confirm-box" @onclick:stopPropagation="true">
+            <p class="confirm-message">
+                <strong>Start over completely?</strong><br />
+                Every piece of data including your account will be erased.
+                You will need to create a new account when the app restarts.
+            </p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="DoResetAsync" disabled="@_busy">
+                    @(_busy ? "Resetting…" : "Yes, wipe everything")
+                </button>
+                <button class="btn-secondary" @onclick="() => _confirmReset = false" disabled="@_busy">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool   _busy;
+    private bool   _confirmClear;
+    private bool   _confirmReset;
+    private string _error      = string.Empty;
+    private string _success    = string.Empty;
+    private string _currentPwd = string.Empty;
+    private string _newPwd     = string.Empty;
+    private string _confirmPwd = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsUnlocked)
+            Nav.NavigateTo("/unlock", replace: true);
+    }
+
+    private async Task DoChangePasswordAsync()
+    {
+        _error   = string.Empty;
+        _success = string.Empty;
+
+        if (_newPwd != _confirmPwd)
+        {
+            _error = "New password and confirmation do not match.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await AuthService.ChangePasswordAsync(_currentPwd, _newPwd);
+            if (!result.IsSuccess)
+            {
+                _error = result.Error ?? "Failed to change password.";
+                return;
+            }
+
+            _currentPwd = string.Empty;
+            _newPwd     = string.Empty;
+            _confirmPwd = string.Empty;
+            _success    = "Password changed successfully.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DoClearAsync()
+    {
+        _busy    = true;
+        _error   = string.Empty;
+        _success = string.Empty;
+
+        try
+        {
+            var result = await DataManagement.ClearPersonalDataAsync();
+            if (!result.IsSuccess)
+            {
+                _error = result.Error ?? "Failed to clear data.";
+                return;
+            }
+            _confirmClear = false;
+            Nav.NavigateTo("/dashboard", replace: true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DoResetAsync()
+    {
+        _busy    = true;
+        _error   = string.Empty;
+        _success = string.Empty;
+
+        try
+        {
+            var result = await DataManagement.FullResetAsync();
+            if (!result.IsSuccess)
+            {
+                _error = result.Error ?? "Failed to reset app.";
+                return;
+            }
+
+            AuthService.Lock();
+            await AuthService.LoadAsync();
+
+            Nav.NavigateTo("/", replace: true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

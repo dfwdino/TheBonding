@@ -167,6 +167,52 @@ public sealed class AuthService : IAuthService
     }
 
     // -------------------------------------------------------------------------
+    // Change password
+    // -------------------------------------------------------------------------
+
+    public async Task<Result> ChangePasswordAsync(string currentPassword, string newPassword)
+    {
+        if (!IsUnlocked)
+            return Result.Failure("App is not unlocked.");
+
+        if (string.IsNullOrWhiteSpace(currentPassword))
+            return Result.Failure("Current password cannot be empty.");
+
+        if (string.IsNullOrWhiteSpace(newPassword))
+            return Result.Failure("New password cannot be empty.");
+
+        _cached = await _settingsRepo.GetAsync();
+        if (_cached == null)
+            return Result.Failure("App settings not found.");
+
+        // Verify current password
+        var oldSalt     = Convert.FromBase64String(_cached.Salt);
+        var oldKey1     = _encryption.DeriveKey1(currentPassword, oldSalt);
+        var oldVerifier = _encryption.ComputeAuthVerifier(oldKey1);
+
+        if (!string.Equals(oldVerifier, _cached.AuthVerifier, StringComparison.Ordinal))
+            return Result.Failure("Current password is incorrect.");
+
+        // Derive new key material — generate a fresh salt for the new password
+        var newSalt         = _encryption.GenerateSalt();
+        var newKey1         = _encryption.DeriveKey1(newPassword, newSalt);
+        var newAuthVerifier = _encryption.ComputeAuthVerifier(newKey1);
+        var newEncryptedKey2 = _encryption.EncryptKey2(_key2!, newKey1);
+
+        await _settingsRepo.UpdateCredentialsAsync(
+            Convert.ToBase64String(newSalt),
+            newAuthVerifier,
+            newEncryptedKey2);
+
+        // Update cached state
+        _cached.Salt          = Convert.ToBase64String(newSalt);
+        _cached.AuthVerifier  = newAuthVerifier;
+        _cached.EncryptedKey2 = newEncryptedKey2;
+
+        return Result.Success();
+    }
+
+    // -------------------------------------------------------------------------
     // Lockout status
     // -------------------------------------------------------------------------
 

@@ -51,4 +51,10 @@ public interface IAuthService
 
     /// <summary>Returns the lockout expiry time, or null if not locked out.</summary>
     Task<DateTime?> GetLockoutUntilAsync();
+
+    /// <summary>
+    /// Changes the user's password. Verifies the current password, then re-derives
+    /// Key1 and re-encrypts Key2 under the new password. Key2 (and all data) is unchanged.
+    /// </summary>
+    Task<Result> ChangePasswordAsync(string currentPassword, string newPassword);
 }

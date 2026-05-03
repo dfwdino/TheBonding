@@ -12,4 +12,5 @@ public interface IAppSettingsRepository
     Task CreateAsync(AppSettings settings);
     Task UpdateFailedAttemptsAsync(int count, DateTime? lockoutUntil);
     Task ResetFailedAttemptsAsync();
+    Task UpdateCredentialsAsync(string salt, string authVerifier, string encryptedKey2);
 }

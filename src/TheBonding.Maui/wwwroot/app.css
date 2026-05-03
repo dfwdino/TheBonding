@@ -1175,3 +1175,74 @@ h1:focus {
     font-size: 0.7rem;
     color: #aaa;
 }
+
+/* =============================================================
+   Export warning banner
+   ============================================================= */
+
+.export-warning {
+    background: #fff8e1;
+    border: 1px solid #f0c040;
+    border-left: 4px solid #f0a000;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: #7a5200;
+    margin-top: 1rem;
+    line-height: 1.5;
+}
+
+/* =============================================================
+   Data & Privacy — settings card
+   ============================================================= */
+
+.settings-card {
+    border: 1px solid #dde2ea;
+    border-radius: 8px;
+    padding: 1.25rem;
+    background: #f9fafb;
+}
+
+.settings-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1b1b2f;
+    margin: 0 0 0.25rem;
+}
+
+/* =============================================================
+   Data & Privacy — danger zone
+   ============================================================= */
+
+.danger-zone-card {
+    border: 1px solid #f5c6cb;
+    border-left: 4px solid #c82333;
+    border-radius: 8px;
+    padding: 1.25rem 1.25rem 1rem;
+    background: #fff5f5;
+    margin-top: 1.5rem;
+}
+
+.danger-zone-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #a71d2a;
+    margin: 0 0 0.5rem;
+}
+
+.btn-danger {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+    background: #c82333;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 0.75rem;
+    transition: background 0.15s;
+}
+
+.btn-danger:hover:not(:disabled) { background: #a71d2a; }
+.btn-danger:disabled              { opacity: 0.55; cursor: not-allowed; }

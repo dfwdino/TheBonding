@@ -79,6 +79,26 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await cmd.ExecuteNonQueryAsync();
     }
 
+    public async Task UpdateCredentialsAsync(string salt, string authVerifier, string encryptedKey2)
+    {
+        using var connection = _factory.CreateConnection();
+        await connection.OpenAsync();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            UPDATE AppSettings
+            SET Salt          = @salt,
+                AuthVerifier  = @authVerifier,
+                EncryptedKey2 = @encryptedKey2
+            WHERE Id = 1;
+            """;
+        cmd.Parameters.AddWithValue("@salt",          salt);
+        cmd.Parameters.AddWithValue("@authVerifier",  authVerifier);
+        cmd.Parameters.AddWithValue("@encryptedKey2", encryptedKey2);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     public async Task ResetFailedAttemptsAsync()
     {
         using var connection = _factory.CreateConnection();
