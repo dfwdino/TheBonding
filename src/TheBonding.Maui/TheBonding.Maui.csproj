@@ -24,8 +24,7 @@
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
-		<ApplicationDisplayVersion>1.25.05.2</ApplicationDisplayVersion>
-		
+
 
         <!-- Windows: run unpackaged (no Store requirement) -->
         <WindowsPackageType>None</WindowsPackageType>
