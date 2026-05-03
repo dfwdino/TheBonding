@@ -41,8 +41,29 @@ jobs:
     - name: Install MAUI Android workload
       run: dotnet workload install maui-android
 
+    # 1. Restore MAUI for android — cascade will write lib assets with android TFM context
+    - name: Restore MAUI (android)
+      run: dotnet restore ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-android
+
+    # 2. Re-restore each lib individually — overwrites bad assets with correct net10.0 targets
+    - name: Restore class libraries
+      run: |
+        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
+        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
+        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
+        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
+
+    # 3. Build libs with --no-restore so they use the correct net10.0 assets from step 2
+    - name: Build class libraries
+      run: |
+        dotnet build src/TheBonding.Domain/TheBonding.Domain.csproj               -c Release --no-restore
+        dotnet build src/TheBonding.Shared/TheBonding.Shared.csproj               -c Release --no-restore
+        dotnet build src/TheBonding.Application/TheBonding.Application.csproj      -c Release --no-restore
+        dotnet build src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj -c Release --no-restore
+
+    # 4. Build MAUI only — valid MAUI android assets + valid lib net10.0 assets + pre-built lib DLLs
     - name: Build Android
-      run: dotnet build ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-android -c Release
+      run: dotnet build ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-android -c Release --no-restore --no-dependencies
 
     - name: Rename APK
       run: |
@@ -71,8 +92,29 @@ jobs:
     - name: Install MAUI Windows workload
       run: dotnet workload install maui-windows
 
+    # 1. Restore MAUI for windows — cascade will write lib assets with windows TFM context
+    - name: Restore MAUI (windows)
+      run: dotnet restore ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-windows10.0.19041.0 -r win-x64
+
+    # 2. Re-restore each lib individually — overwrites bad assets with correct net10.0 targets
+    - name: Restore class libraries
+      run: |
+        dotnet restore src/TheBonding.Domain/TheBonding.Domain.csproj
+        dotnet restore src/TheBonding.Shared/TheBonding.Shared.csproj
+        dotnet restore src/TheBonding.Application/TheBonding.Application.csproj
+        dotnet restore src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj
+
+    # 3. Build libs with --no-restore so they use the correct net10.0 assets from step 2
+    - name: Build class libraries
+      run: |
+        dotnet build src/TheBonding.Domain/TheBonding.Domain.csproj               -c Release --no-restore
+        dotnet build src/TheBonding.Shared/TheBonding.Shared.csproj               -c Release --no-restore
+        dotnet build src/TheBonding.Application/TheBonding.Application.csproj      -c Release --no-restore
+        dotnet build src/TheBonding.Infrastructure/TheBonding.Infrastructure.csproj -c Release --no-restore
+
+    # 4. Build MAUI only — valid MAUI windows assets + valid lib net10.0 assets + pre-built lib DLLs
     - name: Build Windows
-      run: dotnet build ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-windows10.0.19041.0 -r win-x64 -c Release
+      run: dotnet build ${{ env.PROJECT }} -p:TargetFrameworks=net10.0-windows10.0.19041.0 -r win-x64 -c Release --no-restore --no-dependencies
 
     - name: Zip Windows build
       run: Compress-Archive -Path "src/TheBonding.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/*" -DestinationPath "${{ env.APP_NAME }} - ${{ env.VERSION }}.zip"
