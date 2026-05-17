@@ -38,6 +38,16 @@
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     </PropertyGroup>
 
+    <!-- Android: stable sideload signing so every build produces the same signature.
+         Uninstall/reinstall is only needed when switching to the production keystore. -->
+    <PropertyGroup Condition="$(TargetFramework.Contains('android'))">
+        <AndroidKeyStore>True</AndroidKeyStore>
+        <AndroidSigningKeyStore>Signing\sideload.keystore</AndroidSigningKeyStore>
+        <AndroidSigningKeyAlias>thebonding-sideload</AndroidSigningKeyAlias>
+        <AndroidSigningKeyPass>sideload123</AndroidSigningKeyPass>
+        <AndroidSigningStorePass>sideload123</AndroidSigningStorePass>
+    </PropertyGroup>
+
     <!-- Android Release: always produce an App Bundle (required by Play Store) -->
     <PropertyGroup Condition="$(TargetFramework.Contains('android')) and '$(Configuration)' == 'Release'">
         <AndroidPackageFormat>aab</AndroidPackageFormat>
