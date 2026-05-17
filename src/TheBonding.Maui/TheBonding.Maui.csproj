@@ -21,19 +21,33 @@
         <!-- App Identifier -->
         <ApplicationId>com.thebonding.app</ApplicationId>
 
-        <!-- Versions -->
-        <ApplicationDisplayVersion>1.2505.03</ApplicationDisplayVersion>
+        <!-- Versions
+             Android versionName: 1.YYYY.MM.DD  (increment ApplicationVersion integer on every Play Store upload)
+             Windows MSIX:        1.YYYY.MMDD.0  (Store requires last component = 0; MMDD encodes month+day) -->
+        <ApplicationDisplayVersion Condition="$(TargetFramework.Contains('android'))">1.2026.05.17</ApplicationDisplayVersion>
+        <ApplicationDisplayVersion Condition="$(TargetFramework.Contains('windows'))">1.2026.517.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
-		
 
-
-        <!-- Windows: run unpackaged (no Store requirement) -->
+        <!-- Windows: run unpackaged (no Store requirement)
+             REMOVE this line when submitting to the Microsoft Store (switches to MSIX packaging) -->
         <WindowsPackageType>None</WindowsPackageType>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     </PropertyGroup>
+
+    <!-- Android Release: always produce an App Bundle (required by Play Store) -->
+    <PropertyGroup Condition="$(TargetFramework.Contains('android')) and '$(Configuration)' == 'Release'">
+        <AndroidPackageFormat>aab</AndroidPackageFormat>
+    </PropertyGroup>
+
+    <!-- Windows: include tile/splash PNGs in the MSIX package -->
+    <ItemGroup Condition="$(TargetFramework.Contains('windows'))">
+        <Content Include="Platforms\Windows\Assets\*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 
     <ItemGroup>
         <!-- App Icon -->
