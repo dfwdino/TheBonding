@@ -1,5 +1,7 @@
 @page "/export"
 @using System.Text.Json
+@using Microsoft.Maui.ApplicationModel.DataTransfer
+@using Microsoft.Maui.Storage
 @inject IAuthService AuthService
 @inject IActivityService ActivityService
 @inject IPartnerService PartnerService
@@ -108,7 +110,20 @@
             var json = JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true });
             var filename = $"bonding-export-{DateTime.Now:yyyy-MM-dd}.json";
 
+#if ANDROID
+            // Android WebView ignores <a download> — write to cache and open the share sheet
+            // so the user can save to Files, Drive, email, etc.
+            var path = Path.Combine(FileSystem.CacheDirectory, filename);
+            await File.WriteAllTextAsync(path, json);
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "Export The Bonding Data",
+                File  = new ShareFile(path)
+            });
+#else
+            // Windows: JS download triggers the browser save dialog
             await JS.InvokeVoidAsync("downloadTextFile", filename, json);
+#endif
             _exported = true;
         }
         catch (Exception ex)
