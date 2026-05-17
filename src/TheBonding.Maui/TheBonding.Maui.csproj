@@ -22,10 +22,11 @@
         <ApplicationId>com.thebonding.app</ApplicationId>
 
         <!-- Versions
-             Android versionName: 1.YYYY.MM.DD  (increment ApplicationVersion integer on every Play Store upload)
-             Windows MSIX:        1.YYYY.MMDD.0  (Store requires last component = 0; MMDD encodes month+day) -->
-        <ApplicationDisplayVersion Condition="$(TargetFramework.Contains('android'))">1.2026.05.17</ApplicationDisplayVersion>
-        <ApplicationDisplayVersion Condition="$(TargetFramework.Contains('windows'))">1.2026.517.0</ApplicationDisplayVersion>
+             MAUI requires a 3-part semver (major.minor.patch). Date is encoded as 1.YYYY.MMDD
+             where MMDD = month + day with no leading zero (e.g. May 17 → 517).
+             MAUI automatically appends .0 when building the Windows MSIX manifest.
+             Increment ApplicationVersion (integer) on every Play Store upload. -->
+        <ApplicationDisplayVersion>1.2026.517</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
 
         <!-- Windows: run unpackaged (no Store requirement)
