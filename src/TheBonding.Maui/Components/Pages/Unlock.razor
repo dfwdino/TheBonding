@@ -1,6 +1,7 @@
 @page "/unlock"
 @layout AuthLayout
 @inject IAuthService AuthService
+@inject IDataManagementService DataManagement
 @inject NavigationManager Nav
 
 @if (_loading)
@@ -58,17 +59,79 @@ else
                 disabled="@string.IsNullOrWhiteSpace(_password)">
             Unlock
         </button>
+
+        <div style="text-align:center;margin-top:1.25rem">
+            <button type="button" class="btn-link-inline" @onclick="() => _confirmForgot = true">
+                Forgot your password?
+            </button>
+        </div>
     }
 </div>
 }
 
+@* ── Step 1: Explain what "forgot password" actually means ── *@
+@if (_confirmForgot)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-box" style="border-top:4px solid #c0392b">
+            <p style="font-size:1.5rem;text-align:center;margin:0 0 0.5rem">⚠️</p>
+            <p class="confirm-message" style="text-align:center">
+                <strong>There is no password recovery.</strong>
+            </p>
+            <p class="text-muted" style="font-size:0.9rem;margin:0.5rem 0 1rem">
+                Your data is encrypted with a key that only your password can unlock.
+                If you've forgotten your password, the <strong>only option is to wipe
+                the entire app</strong> — all events, partners, health records, and
+                your account will be <strong>permanently deleted</strong> with no way
+                to get them back.
+            </p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="ShowFinalConfirm" disabled="@_resetting">
+                    I understand — show me the delete option
+                </button>
+                <button class="btn-secondary" @onclick="() => _confirmForgot = false" disabled="@_resetting">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Step 2: Final "no going back" confirmation ── *@
+@if (_confirmForgotFinal)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-box" style="border-top:4px solid #c0392b">
+            <p style="font-size:1.5rem;text-align:center;margin:0 0 0.5rem">🗑️</p>
+            <p class="confirm-message" style="text-align:center;color:#c0392b">
+                <strong>This is your last chance to cancel.</strong>
+            </p>
+            <p class="text-muted" style="font-size:0.9rem;margin:0.5rem 0 1rem;text-align:center">
+                Tapping the button below will <strong>permanently erase everything</strong>
+                in this app. This action <strong>cannot be undone</strong>.
+            </p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="DoFullResetAsync" disabled="@_resetting">
+                    @(_resetting ? "Deleting…" : "Yes, delete everything and start over")
+                </button>
+                <button class="btn-secondary" @onclick="CancelForgot" disabled="@_resetting">
+                    Cancel — take me back
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    private string    _password     = string.Empty;
-    private string    _error        = string.Empty;
-    private bool      _loading      = false;
-    private bool      _showPassword = false;
-    private bool      _lockedOut    = false;
-    private DateTime? _lockoutUntil = null;
+    private string    _password          = string.Empty;
+    private string    _error             = string.Empty;
+    private bool      _loading           = false;
+    private bool      _showPassword      = false;
+    private bool      _lockedOut         = false;
+    private DateTime? _lockoutUntil      = null;
+    private bool      _confirmForgot     = false;
+    private bool      _confirmForgotFinal = false;
+    private bool      _resetting         = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,6 +160,34 @@ else
     private async Task HandleKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await UnlockAsync();
+    }
+
+    private void ShowFinalConfirm()
+    {
+        _confirmForgot      = false;
+        _confirmForgotFinal = true;
+    }
+
+    private void CancelForgot()
+    {
+        _confirmForgot      = false;
+        _confirmForgotFinal = false;
+    }
+
+    private async Task DoFullResetAsync()
+    {
+        _resetting = true;
+        try
+        {
+            await DataManagement.FullResetAsync();
+            AuthService.Lock();
+            await AuthService.LoadAsync();
+            Nav.NavigateTo("/", replace: true);
+        }
+        finally
+        {
+            _resetting = false;
+        }
     }
 
     private async Task UnlockAsync()

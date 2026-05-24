@@ -26,7 +26,7 @@
              where MMDD = month + day with no leading zero (e.g. May 17 → 517).
              MAUI automatically appends .0 when building the Windows MSIX manifest.
              Increment ApplicationVersion (integer) on every Play Store upload. -->
-        <ApplicationDisplayVersion>1.2026.517</ApplicationDisplayVersion>
+        <ApplicationDisplayVersion>1.2026.0524</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
 
         <!-- Windows: run unpackaged (no Store requirement)

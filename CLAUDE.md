@@ -10,14 +10,29 @@ Target platforms are **Android** and **Windows only** (no iOS or Mac — intenti
 # Build for Windows
 dotnet build src/TheBonding.Maui/TheBonding.Maui.csproj -f net10.0-windows10.0.19041.0
 
-# Build for Android
+# Build for Android (debug — signed with sideload.keystore)
 dotnet build src/TheBonding.Maui/TheBonding.Maui.csproj -f net10.0-android
+
+# Build for Android (release — produces .aab for Play Store)
+dotnet publish src/TheBonding.Maui/TheBonding.Maui.csproj -f net10.0-android -c Release
 
 # Run on Windows
 dotnet run --project src/TheBonding.Maui/TheBonding.Maui.csproj -f net10.0-windows10.0.19041.0
 ```
 
+If the build fails with "Assets file doesn't have a target", delete `src/TheBonding.Maui/obj` and `bin` then re-run — do not use `--no-restore`.
+
 There are no automated tests in this repository.
+
+## Versioning
+
+`ApplicationDisplayVersion` uses 3-part semver required by MAUI's resizetizer: **`1.YYYY.MMDD`** where MMDD is month+day with no leading zero (e.g. May 17 → `517`). MAUI automatically appends `.0` when building the Windows MSIX manifest. Increment `ApplicationVersion` (integer) on every Play Store upload.
+
+## Signing
+
+All Android builds (debug and release) use `src/TheBonding.Maui/Signing/sideload.keystore` so every build produces the same APK signature regardless of machine. This prevents "package conflicts with existing package" errors when sideloading updates.
+
+When submitting to the Play Store, add a production keystore and split the signing config into Debug (sideload key) and Release (production key) property groups. Production keystore passwords go in environment variables — never in the csproj.
 
 ## Architecture
 
@@ -78,3 +93,66 @@ Repositories return `Domain.Entities.*` objects with raw encrypted `DataBlob` st
 - Pages check `AuthService.IsUnlocked` in `OnInitialized` and redirect to `/unlock` if false.
 - Data loads in `OnAfterRenderAsync(firstRender)`, not `OnInitializedAsync`, to avoid blocking the initial render.
 - `StateHasChanged()` is called manually after async data loads complete.
+- `MainLayout` handles swipe-right-from-left-edge to open the nav drawer and swipe-left to close via `TouchEventArgs` — no JS required.
+
+## Platform-Specific Patterns
+
+JS-based file downloads and the native share sheet differ between platforms. Use MAUI native APIs and guard with `#if ANDROID` / `#else`:
+
+| Operation | Android | Windows |
+|---|---|---|
+| File pick (import) | `FilePicker.Default.PickAsync()` | `FilePicker.Default.PickAsync()` — same API, no guard needed |
+| File save/share (export) | `Share.Default.RequestAsync(new ShareFileRequest(...))` writing to `FileSystem.CacheDirectory` first | `JS.InvokeVoidAsync("downloadTextFile", ...)` |
+
+The `#if ANDROID` guard is only needed for the **save/share** path. `FilePicker` works on both platforms without a guard — see `Import.razor` (no conditional) vs `Export.razor` (conditional on save).
+
+`AndroidManifest.xml` has `allowBackup="false"` (intentional — prevents encrypted database from being included in Android backups) and no INTERNET or network permissions (the Blazor WebView uses a local asset loader that does not require them).
+
+## Adding New Services
+
+When adding a new service, register it in **both** extension methods:
+
+- `TheBonding.Infrastructure/ServiceCollectionExtensions.cs` → `AddInfrastructureServices()` for repositories and infrastructure services.
+- `TheBonding.Application/ServiceCollectionExtensions.cs` → `AddApplicationServices()` for application-layer services.
+
+All services are registered as **Singleton**. `DbConnectionFactory` is the only singleton registered directly in `MauiProgram.cs` (it needs the platform-specific DB path before DI is built).
+
+## App Routes
+
+| Route | Page | Layout |
+|---|---|---|
+| `/` | `Home.razor` — redirects to setup/unlock/dashboard | AuthLayout |
+| `/setup` | `Setup.razor` — first-launch password creation | AuthLayout |
+| `/unlock` | `Unlock.razor` — password entry | AuthLayout |
+| `/dashboard` | `Dashboard.razor` — stats + recent events | MainLayout |
+| `/events` | `Events.razor` — event list | MainLayout |
+| `/events/new` | `EventForm.razor` | MainLayout |
+| `/events/{id}/edit` | `EventForm.razor` | MainLayout |
+| `/partners` | `Partners.razor` — partner list | MainLayout |
+| `/partners/new` | `PartnerForm.razor` | MainLayout |
+| `/partners/{id}` | `PartnerDetail.razor` | MainLayout |
+| `/partners/{id}/edit` | `PartnerForm.razor` | MainLayout |
+| `/profile` | `Profile.razor` — user profile + health history | MainLayout |
+| `/lookups` | `Lookups.razor` — manage list categories/items | MainLayout |
+| `/export` | `Export.razor` | MainLayout |
+| `/import` | `Import.razor` | MainLayout |
+| `/data-privacy` | `DataPrivacy.razor` — clear/reset data | MainLayout |
+
+## Data Management
+
+`DataManagementService` (Infrastructure) exposes two wipe operations:
+
+- `ClearPersonalDataAsync()` — deletes Activity, PartnerHealthStatus, Partner, UserProfile, UserHealthStatus rows but leaves AppSettings and LookupItems intact (app stays set up and unlockable).
+- `FullResetAsync()` — additionally deletes LookupItem and AppSettings rows; the app returns to first-launch state.
+
+## Miscellaneous
+
+- `LangVersion=preview` is set in the csproj — C# preview features are available.
+- `MauiProgram.StartupError` (static string?) is set if DB init or auth load fails at startup. `Home.razor` reads it and renders the error instead of routing.
+- `CheckboxList.razor` (`Components/Shared/`) is a reusable multi-select checkbox list used by `EventForm.razor` for lookup-backed multi-value fields (activity types, positions, roles, etc.).
+
+## Store Readiness
+
+**Windows Store** — `Package.appxmanifest` has two `TODO` fields (`Identity Name` and `Publisher CN`) that must be filled from Microsoft Partner Center → App management → App identity. The line `<WindowsPackageType>None</WindowsPackageType>` in the csproj must be removed when building for Store submission (switches from unpackaged to MSIX). Windows tile PNG assets are in `Platforms/Windows/Assets/`.
+
+**Privacy policy** — hosted at `https://dfwdino.github.io/TheBonding/` via `docs/index.html` (GitHub Pages, `/docs` folder). Update the effective date in that file when the policy changes.
