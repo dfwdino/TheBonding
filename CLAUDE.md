@@ -30,9 +30,18 @@ There are no automated tests in this repository.
 
 ## Signing
 
-All Android builds (debug and release) use `src/TheBonding.Maui/Signing/sideload.keystore` so every build produces the same APK signature regardless of machine. This prevents "package conflicts with existing package" errors when sideloading updates.
+The csproj has **two separate signing property groups**:
 
-When submitting to the Play Store, add a production keystore and split the signing config into Debug (sideload key) and Release (production key) property groups. Production keystore passwords go in environment variables — never in the csproj.
+- **Debug** — uses `Signing/sideload.keystore` (alias `thebonding-sideload`, password `sideload123`). Every debug build produces the same APK signature so sideloaded installs update cleanly without uninstall/reinstall.
+- **Release** — uses `Signing/production.keystore` (alias `thebonding-prod`). Passwords are read from `$(PROD_KEY_PASS)` and `$(PROD_STORE_PASS)` environment variables — never hardcoded. Set these before running a release publish:
+
+```powershell
+$env:PROD_KEY_PASS   = "..."
+$env:PROD_STORE_PASS = "..."
+dotnet publish src/TheBonding.Maui/TheBonding.Maui.csproj -f net10.0-android -c Release
+```
+
+`production.keystore` must never be lost — Google permanently ties the Play Store listing to it.
 
 ## Architecture
 
@@ -144,6 +153,27 @@ All services are registered as **Singleton**. `DbConnectionFactory` is the only 
 
 - `ClearPersonalDataAsync()` — deletes Activity, PartnerHealthStatus, Partner, UserProfile, UserHealthStatus rows but leaves AppSettings and LookupItems intact (app stays set up and unlockable).
 - `FullResetAsync()` — additionally deletes LookupItem and AppSettings rows; the app returns to first-launch state.
+
+## Destructive Action Pattern
+
+All destructive actions (delete partner, clear data, full reset, forgot-password wipe) use a two-step confirm overlay defined inline in the page:
+
+```razor
+@if (_confirmDelete)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-box">
+            <p class="confirm-message">...</p>
+            <div class="confirm-actions">
+                <button class="btn-danger" @onclick="DoDeleteAsync">Yes, delete</button>
+                <button class="btn-secondary" @onclick="() => _confirmDelete = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+```
+
+`Unlock.razor` intentionally injects `IDataManagementService` — it uses a **two-step** confirm flow (step 1 explains there is no password recovery; step 2 is a final "no going back" confirmation) before calling `FullResetAsync()`. This is the forgot-password path and is the only place outside `DataPrivacy.razor` that calls a wipe operation.
 
 ## Miscellaneous
 
